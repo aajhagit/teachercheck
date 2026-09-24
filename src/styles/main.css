@@ -1,0 +1,362 @@
+/* TeacherCheck Main Application Styles */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--color-desk);
+  background-image: 
+    radial-gradient(var(--color-paper-edge) 1px, transparent 1px),
+    linear-gradient(to bottom, #F5F1E8 0%, #E9E4D8 100%);
+  background-size: 24px 24px, 100% 100%;
+  padding: 16px 12px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+@media (min-width: 640px) {
+  body {
+    padding: 32px 20px 60px;
+  }
+}
+
+/* App Container */
+.app-container {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Header Area */
+.app-header {
+  text-align: center;
+  padding: 8px 12px;
+}
+
+.logo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.logo-pen-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--color-ink-teacher);
+}
+
+.app-title {
+  font-family: var(--font-student);
+  font-size: 2.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #1F2937;
+}
+
+@media (min-width: 640px) {
+  .app-title {
+    font-size: 2.5rem;
+  }
+}
+
+.app-tagline {
+  font-family: var(--font-teacher);
+  font-size: 1.35rem;
+  color: #4B5563;
+  margin-top: 2px;
+}
+
+/* Philosophy Banner */
+.philosophy-banner {
+  text-align: center;
+  font-family: var(--font-teacher);
+  font-size: 1.15rem;
+  color: var(--color-ink-teacher-dark);
+  opacity: 0.9;
+  letter-spacing: 0.01em;
+  padding: 4px 12px;
+}
+
+/* Action Controls */
+/* Action Controls */
+.actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.input-actions-wrap {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .input-actions-wrap {
+    width: auto;
+  }
+}
+
+/* Result Actions Bar */
+.result-actions-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+@media (min-width: 580px) {
+  .result-actions-bar {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+}
+
+.result-buttons-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+@media (min-width: 480px) {
+  .result-buttons-primary {
+    flex-direction: row;
+    width: auto;
+  }
+}
+
+.result-buttons-secondary {
+  display: flex;
+  width: 100%;
+}
+
+@media (min-width: 580px) {
+  .result-buttons-secondary {
+    width: auto;
+  }
+}
+
+/* Primary Button: Strong Red Accent */
+.btn-primary-red {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: var(--color-ink-teacher);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  padding: 13px 28px;
+  min-height: 48px;
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 
+    0 2px 4px rgba(197, 34, 31, 0.25),
+    0 6px 16px rgba(197, 34, 31, 0.2);
+  transition: all 0.18s ease;
+  width: 100%;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 640px) {
+  .btn-primary-red {
+    width: auto;
+    min-width: 200px;
+  }
+}
+
+.btn-primary-red:hover {
+  background-color: #B31818;
+  transform: translateY(-1px);
+  box-shadow: 
+    0 3px 6px rgba(197, 34, 31, 0.3),
+    0 8px 20px rgba(197, 34, 31, 0.25);
+}
+
+.btn-primary-red:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(197, 34, 31, 0.2);
+}
+
+.btn-primary-red:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-primary-red.is-loading {
+  cursor: wait;
+}
+
+@keyframes penScribble {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-15deg) translateY(-2px); }
+  50% { transform: rotate(0deg); }
+  75% { transform: rotate(15deg) translateY(1px); }
+  100% { transform: rotate(0deg); }
+}
+
+.pen-loading-icon {
+  display: inline-block;
+  animation: penScribble 0.7s ease-in-out infinite;
+}
+
+/* Notebook Error Alert */
+.notebook-error-banner {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background-color: #FEF2F2;
+  border-left: 3px solid #DC2626;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: #991B1B;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Secondary Button: Paper Style */
+.btn-secondary-paper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #4B5563;
+  border: 1px solid #D1D5DB;
+  background-color: rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  padding: 11px 20px;
+  min-height: 44px;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 480px) {
+  .btn-secondary-paper {
+    width: auto;
+  }
+}
+
+.btn-secondary-paper:hover {
+  background-color: #FFFFFF;
+  border-color: #9CA3AF;
+  color: #1F2937;
+  transform: translateY(-1px);
+}
+
+.btn-secondary-paper:active {
+  transform: translateY(1px);
+}
+
+/* Copy Button Specific Polish */
+.btn-copy {
+  border-color: #CBD5E1;
+  color: #475569;
+}
+
+.btn-copy:hover {
+  border-color: var(--color-ink-teacher);
+  color: var(--color-ink-teacher-dark);
+}
+
+.btn-copy.is-copied {
+  background-color: #ECFDF5 !important;
+  border-color: #10B981 !important;
+  color: #047857 !important;
+}
+
+/* Classroom Example Prompts */
+.presets-section {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background-color: rgba(255, 255, 255, 0.45);
+  border: 1px dashed #D5CEBE;
+  border-radius: 8px;
+}
+
+.presets-label {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: #6B7280;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.presets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-chip {
+  background-color: var(--color-paper);
+  border: 1px solid #D1C7B5;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-family: var(--font-student);
+  font-size: 0.95rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.preset-chip:hover {
+  background-color: #FFFFFF;
+  border-color: var(--color-ink-teacher);
+  color: var(--color-ink-teacher-dark);
+  transform: translateY(-1px);
+}
+
+/* Footer */
+.app-footer {
+  text-align: center;
+  padding: 16px 8px 8px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: #9CA3AF;
+}
+
+.app-footer a {
+  color: #6B7280;
+  text-decoration: none;
+}
+
+/* Subtle utility */
+.hidden {
+  display: none !important;
+}

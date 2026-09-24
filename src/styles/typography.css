@@ -1,0 +1,37 @@
+/* TeacherCheck Typography System */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap');
+
+:root {
+  --font-teacher: 'Caveat', cursive, sans-serif;
+  --font-student: 'Newsreader', Georgia, serif;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Ink & Paper Palette */
+  --color-paper: #FBF8F1;
+  --color-paper-edge: #EDE8DE;
+  --color-desk: #ECE7DE;
+  --color-ink-student: #23272F;
+  --color-ink-subtle: #6B7280;
+  --color-ink-teacher: #C5221F;
+  --color-ink-teacher-dark: #9F1614;
+  --color-ink-teacher-bg: rgba(197, 34, 31, 0.07);
+  --color-ink-teacher-border: rgba(197, 34, 31, 0.18);
+  --color-rule-line: rgba(70, 115, 175, 0.14);
+  --color-margin-line: rgba(225, 60, 60, 0.24);
+  --color-stamp-green: #1B7A43;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--color-ink-student);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-teacher {
+  font-family: var(--font-teacher);
+}
+
+.font-student {
+  font-family: var(--font-student);
+}

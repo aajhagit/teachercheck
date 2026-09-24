@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Notebook paper background -->
+  <rect x="8" y="6" width="48" height="52" rx="4" fill="#FAF7F0" stroke="#DDD6C6" stroke-width="2"/>
+  <!-- Ruled lines -->
+  <line x1="16" y1="20" x2="48" y2="20" stroke="#D1DCED" stroke-width="1.5"/>
+  <line x1="16" y1="32" x2="48" y2="32" stroke="#D1DCED" stroke-width="1.5"/>
+  <line x1="16" y1="44" x2="48" y2="44" stroke="#D1DCED" stroke-width="1.5"/>
+  <!-- Margin line -->
+  <line x1="20" y1="6" x2="20" y2="58" stroke="#F87171" stroke-width="1" stroke-opacity="0.6"/>
+  <!-- Red pen mark / check -->
+  <path d="M26 32 L34 40 L52 18" fill="none" stroke="#C5221F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

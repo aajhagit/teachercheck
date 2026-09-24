@@ -1,0 +1,499 @@
+/* Notebook Paper & Teacher Correction Styles */
+
+.notebook-sheet {
+  position: relative;
+  background-color: var(--color-paper);
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 51px,
+    var(--color-rule-line) 51px,
+    var(--color-rule-line) 53px
+  );
+  line-height: 53px;
+  border-radius: 8px;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(45, 35, 20, 0.07),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: box-shadow 0.3s ease;
+}
+
+/* Notebook Binding / Left Margin */
+.notebook-sheet::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 38px;
+  width: 2px;
+  background-color: var(--color-margin-line);
+  z-index: 2;
+  pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  .notebook-sheet::before {
+    left: 56px;
+  }
+}
+
+/* Notebook Header (Date, Subject) */
+.notebook-header {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px 8px 46px;
+  border-bottom: 2px solid var(--color-rule-line);
+  font-family: var(--font-teacher);
+  font-size: 1rem;
+  color: var(--color-ink-subtle);
+  background-color: rgba(251, 248, 241, 0.95);
+  user-select: none;
+}
+
+@media (min-width: 640px) {
+  .notebook-header {
+    padding: 16px 28px 12px 72px;
+    font-size: 1.25rem;
+  }
+}
+
+.notebook-header-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .notebook-header-item {
+    gap: 8px;
+  }
+}
+
+.notebook-header-label {
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: #9CA3AF;
+}
+
+@media (min-width: 640px) {
+  .notebook-header-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+  }
+}
+
+.notebook-header-value {
+  font-family: var(--font-teacher);
+  font-size: 1.05rem;
+  color: #4B5563;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .notebook-header-value {
+    font-size: 1.25rem;
+  }
+}
+
+/* Main Content Area */
+.notebook-body {
+  position: relative;
+  z-index: 3;
+  padding: 14px 20px 20px 52px;
+  min-height: 220px;
+}
+
+@media (min-width: 640px) {
+  .notebook-body {
+    padding: 20px 32px 28px 72px;
+    min-height: 250px;
+  }
+}
+
+/* Writing Textarea */
+.notebook-textarea {
+  width: 100%;
+  min-height: 159px; /* Exactly 3 ruled lines of 53px */
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  font-family: var(--font-student);
+  font-size: 1.35rem;
+  font-weight: 400;
+  color: var(--color-ink-student);
+  line-height: 53px;
+  padding: 0;
+  margin: 0;
+  letter-spacing: -0.01em;
+  caret-color: var(--color-ink-teacher);
+  overflow-y: hidden;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.notebook-textarea::placeholder {
+  color: #9CA3AF;
+  font-style: italic;
+  font-family: var(--font-student);
+  opacity: 0.85;
+}
+
+/* Notebook Footer Meta (Character counter & safe restore prompt) */
+.notebook-footer-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 26px;
+  margin-top: 6px;
+  padding-top: 6px;
+  user-select: none;
+}
+
+.char-counter {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: #9CA3AF;
+  margin-left: auto;
+  letter-spacing: 0.02em;
+  transition: color 0.2s ease, font-weight 0.2s ease;
+}
+
+.char-counter.near-limit {
+  color: #D97706;
+  font-weight: 500;
+}
+
+.char-counter.at-limit {
+  color: #DC2626;
+  font-weight: 600;
+}
+
+.restore-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: #6B7280;
+  background-color: rgba(0, 0, 0, 0.03);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.restore-link {
+  background: none;
+  border: none;
+  color: var(--color-ink-teacher);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.restore-link:hover {
+  color: var(--color-ink-teacher-dark);
+}
+
+/* Correction Toolbar / Subtle Edit Affordance */
+.correction-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.sentence-edit-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(100, 116, 139, 0.07);
+  border: 1px dashed rgba(100, 116, 139, 0.3);
+  color: #475569;
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.sentence-edit-prompt:hover {
+  background: rgba(100, 116, 139, 0.14);
+  color: #1E293B;
+  border-color: rgba(100, 116, 139, 0.45);
+}
+
+.edit-prompt-icon {
+  font-size: 0.85rem;
+  color: #64748B;
+}
+
+/* Sentence Display with Corrections */
+.sentence-correction-view {
+  font-family: var(--font-student);
+  font-size: 1.35rem;
+  line-height: 72px; /* Generous line height so corrections comfortably float above words */
+  color: var(--color-ink-student);
+  letter-spacing: -0.01em;
+  padding-top: 24px; /* Generous room so first line correction never clips against header */
+  padding-bottom: 8px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.sentence-correction-view:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+@media (min-width: 640px) {
+  .sentence-correction-view {
+    font-size: 1.5rem;
+    line-height: 76px;
+    padding-top: 26px;
+  }
+}
+
+/* Mistake Container - strictly centered, zero added margins */
+.correction-token {
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+  text-align: center;
+  margin: 0;
+  max-width: 100%;
+}
+
+/* Original Word Struck-Through */
+.mistake-word {
+  position: relative;
+  display: inline-block;
+  color: var(--color-ink-student);
+}
+
+/* Hand-drawn Red Strike Through - covers the exact word with subtle natural pen stroke */
+.mistake-word::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 50%;
+  height: 2px;
+  background-color: var(--color-ink-teacher);
+  border-radius: 2px;
+  transform: translateY(-50%) rotate(-1.5deg);
+  transform-origin: left center;
+  animation: redStrike 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  pointer-events: none;
+}
+
+@keyframes redStrike {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Correction Word Written Directly Above Mistake - Centered */
+.correction-above {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  transform-origin: center bottom;
+  font-family: var(--font-teacher);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-ink-teacher);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  animation: teacherInkIn 0.3s 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Alternate stagger height for adjacent corrections so they never overlap */
+.correction-token.stagger-up .correction-above {
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) rotate(-1deg);
+}
+
+@media (min-width: 640px) {
+  .correction-above {
+    font-size: 1.75rem;
+    bottom: calc(100% + 3px);
+  }
+  .correction-token.stagger-up .correction-above {
+    bottom: calc(100% + 8px);
+  }
+}
+
+@keyframes teacherInkIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px) scale(0.95) rotate(-2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1) rotate(-2deg);
+  }
+}
+
+/* Teacher's Note Section (at bottom of notebook) */
+.teacher-note-panel {
+  margin-top: 20px;
+  padding: 18px 20px;
+  background-color: var(--color-ink-teacher-bg);
+  border-left: 3px solid var(--color-ink-teacher);
+  border-radius: 0 6px 6px 0;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: noteFadeUp 0.35s 0.4s ease-out forwards;
+}
+
+@keyframes noteFadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.teacher-note-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+@media (min-width: 480px) {
+  .teacher-note-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.teacher-note-title {
+  font-family: var(--font-teacher);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--color-ink-teacher);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.teacher-positive-stamp {
+  font-family: var(--font-teacher);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--color-ink-teacher-dark);
+  background-color: rgba(197, 34, 31, 0.08);
+  border: 1px dashed var(--color-ink-teacher-border);
+  padding: 2px 10px;
+  border-radius: 20px;
+  transform: rotate(-1.5deg);
+}
+
+.teacher-note-body {
+  font-family: var(--font-student);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #374151;
+  font-style: normal;
+}
+
+/* Success / Perfect Sentence Panel */
+.teacher-perfect-panel {
+  margin-top: 24px;
+  padding: 18px 20px;
+  background-color: rgba(27, 122, 67, 0.07);
+  border-left: 3px solid var(--color-stamp-green);
+  border-radius: 0 6px 6px 0;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: noteFadeUp 0.35s 0.3s ease-out forwards;
+}
+
+.teacher-perfect-title {
+  font-family: var(--font-teacher);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--color-stamp-green);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.teacher-perfect-body {
+  font-family: var(--font-student);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #2D3748;
+}
+
+/* Subtle Notebook Status Notice (e.g. for fallback offline mode) */
+.teacher-status-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-student);
+  font-size: 0.95rem;
+  color: #5A6A80;
+  background: rgba(0, 0, 0, 0.035);
+  border: 1px dashed rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+  padding: 4px 10px;
+  margin-top: 12px;
+}
+
+/* AI Temporarily Unavailable Panel (Notebook Aesthetic) */
+.teacher-unavailable-panel {
+  margin-top: 24px;
+  padding: 18px 20px;
+  background-color: rgba(220, 100, 30, 0.06);
+  border-left: 3px solid #D97706;
+  border-radius: 0 6px 6px 0;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: noteFadeUp 0.35s 0.25s ease-out forwards;
+}
+
+.teacher-unavailable-title {
+  font-family: var(--font-teacher);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #B45309;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.teacher-unavailable-body {
+  font-family: var(--font-student);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #4B5563;
+}
