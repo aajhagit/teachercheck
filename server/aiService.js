@@ -136,6 +136,9 @@ function handleAIFailure(text, err) {
 }
 
 async function callGeminiAPI(text, apiKey) {
+  const envModelPresent = Boolean(process.env.GEMINI_MODEL);
+  console.log(`[TeacherCheck Diagnostics] process.env.GEMINI_MODEL present: ${envModelPresent}${envModelPresent ? `, value: ${process.env.GEMINI_MODEL}` : ''}`);
+
   // Use current official Google Gemini Flash models
   const candidateModels = [
     process.env.GEMINI_MODEL,
@@ -147,6 +150,7 @@ async function callGeminiAPI(text, apiKey) {
   let lastError = null;
 
   for (const model of candidateModels) {
+    console.log(`[TeacherCheck Diagnostics] Calling Gemini model: ${model}`);
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
     const promptText = `${SYSTEM_PROMPT}\n\nStudent's sentence to check:\n"""${text}"""\n\nOutput JSON only:`;
@@ -172,13 +176,31 @@ async function callGeminiAPI(text, apiKey) {
 
       if (!response.ok) {
         const status = response.status;
-        const err = new Error(`Provider HTTP ${status}`);
+        let providerCode = null;
+        let providerStatus = null;
+        let sanitizedErrorMessage = 'Unknown error';
+
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) {
+            providerCode = errData.error.code || null;
+            providerStatus = errData.error.status || null;
+            if (typeof errData.error.message === 'string') {
+              sanitizedErrorMessage = errData.error.message.split('\n')[0].substring(0, 200).replace(/key=[^&\s]+/gi, 'key=[REDACTED]');
+            }
+          }
+        } catch {
+          // Ignore JSON parse failures on error responses
+        }
+
+        console.warn(`[TeacherCheck Diagnostics] Model: ${model} | HTTP Status: ${status} | Provider Code/Status: ${providerCode || 'none'}/${providerStatus || 'none'} | Message: ${sanitizedErrorMessage}`);
+
+        const err = new Error(`Provider HTTP ${status}: ${sanitizedErrorMessage}`);
         err.status = status;
         lastError = err;
 
         // If 503 (high demand spike) or 429 (rate limit), try next candidate model
         if (status === 503 || status === 429) {
-          console.warn(`[TeacherCheck AI] Model ${model} returned ${status}. Trying fallback model...`);
           continue;
         }
 
@@ -203,7 +225,7 @@ async function callGeminiAPI(text, apiKey) {
       return normalizeCorrectionResponse(text, parsed);
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-        console.warn(`[TeacherCheck AI] Model ${model} timed out. Trying next candidate...`);
+        console.warn(`[TeacherCheck Diagnostics] Model: ${model} | HTTP Status: Timeout | Provider Code/Status: timeout | Message: Request timed out after 10s`);
         lastError = new Error(`Model ${model} timed out after 10s`);
         continue;
       }
