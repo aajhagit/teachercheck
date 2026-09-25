@@ -9,6 +9,7 @@
     var(--color-rule-line) 51px,
     var(--color-rule-line) 53px
   );
+  background-position: 0 16px;
   line-height: 53px;
   border-radius: 8px;
   box-shadow: 
@@ -347,7 +348,7 @@
 
 /* Alternate stagger height for adjacent corrections so they never overlap */
 .correction-token.stagger-up .correction-above {
-  bottom: calc(100% + 20px);
+  bottom: calc(100% + 12px);
   transform: translateX(-50%) rotate(-1deg);
 }
 
@@ -357,7 +358,7 @@
     bottom: calc(100% + 3px);
   }
   .correction-token.stagger-up .correction-above {
-    bottom: calc(100% + 22px);
+    bottom: calc(100% + 14px);
   }
 }
 
