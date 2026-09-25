@@ -581,6 +581,8 @@ function renderCorrectionView(data) {
 
   if (corrections.length > 0) {
     let cursor = 0;
+    let lastTokenEnd = -1;
+
     corrections.forEach((c, index) => {
       let sIdx = typeof c.startIndex === 'number' ? c.startIndex : rawText.indexOf(c.original, cursor);
       let eIdx = typeof c.endIndex === 'number' ? c.endIndex : sIdx + c.original.length;
@@ -590,29 +592,45 @@ function renderCorrectionView(data) {
       if (eIdx > rawText.length) eIdx = rawText.length;
       if (sIdx >= eIdx) return;
 
+      let sliceStart = sIdx;
+      let sliceEnd = eIdx;
+
+      // Separate any leading punctuation or whitespace so only the actual word is struck through
+      while (sliceStart < sliceEnd && /[\s([{"'“‘]/.test(rawText[sliceStart])) {
+        sliceStart++;
+      }
+      // Separate any trailing punctuation or whitespace so trailing punctuation stays intact in base text
+      while (sliceEnd > sliceStart && /[\s.,!?;:)"'”’\]}]/.test(rawText[sliceEnd - 1])) {
+        sliceEnd--;
+      }
+
+      if (sliceStart >= sliceEnd) {
+        sliceStart = sIdx;
+        sliceEnd = eIdx;
+      }
+
       // 1. Preserved text preceding the mistake (exact spaces, words, punctuation)
-      if (sIdx > cursor) {
-        const textBefore = rawText.substring(cursor, sIdx);
+      if (sliceStart > cursor) {
+        const textBefore = rawText.substring(cursor, sliceStart);
         correctionSentence.appendChild(document.createTextNode(textBefore));
       }
 
-      // 2. Correction token
+      // 2. Cleaned mistake word and correction word
+      const cleanOrigWord = rawText.substring(sliceStart, sliceEnd);
+      let corrWord = c.corrected;
+      if (/[.,!?;:)"'\]}]+$/.test(corrWord) && !/[.,!?;:)"'\]}]+$/.test(cleanOrigWord)) {
+        corrWord = corrWord.replace(/[.,!?;:)"'\]}]+$/, '');
+      }
+
+      // 3. Correction token
       const tokenContainer = document.createElement('span');
       tokenContainer.className = 'correction-token';
 
-      // If adjacent to previous token (separated only by a space), stagger vertically
-      if (index > 0 && (sIdx - corrections[index - 1].endIndex <= 2)) {
+      // For multiple adjacent corrections (separated by small space/punctuation),
+      // alternate vertical stagger so replacement words never collide
+      const isAdjacent = lastTokenEnd >= 0 && (sliceStart - lastTokenEnd <= 4);
+      if (isAdjacent && index % 2 === 1) {
         tokenContainer.classList.add('stagger-up');
-      }
-
-      // Intelligent clearance estimation: if replacement is wider than original, create space
-      const origWord = rawText.substring(sIdx, eIdx);
-      const corrWord = c.corrected;
-      const charDiff = corrWord.length - origWord.length;
-      if (charDiff > 0) {
-        const estMargin = Math.ceil((charDiff * 9.5) / 2) + 6;
-        tokenContainer.style.marginLeft = `${estMargin}px`;
-        tokenContainer.style.marginRight = `${estMargin}px`;
       }
 
       const correctionAbove = document.createElement('span');
@@ -621,29 +639,30 @@ function renderCorrectionView(data) {
 
       const mistakeWord = document.createElement('span');
       mistakeWord.className = 'mistake-word';
-      mistakeWord.textContent = origWord;
+      mistakeWord.textContent = cleanOrigWord;
 
       tokenContainer.appendChild(correctionAbove);
       tokenContainer.appendChild(mistakeWord);
       correctionSentence.appendChild(tokenContainer);
 
-      cursor = eIdx;
+      lastTokenEnd = sliceEnd;
+      cursor = sliceEnd;
     });
 
-    // 3. Trailing preserved text
+    // 4. Trailing preserved text (exact punctuation, spaces, remaining sentence)
     if (cursor < rawText.length) {
       correctionSentence.appendChild(document.createTextNode(rawText.substring(cursor)));
     }
 
-    // 4. Teacher's Note Section (explains all corrections)
+    // 5. Teacher's Note Section (explains all corrections)
     teacherNoteContent.textContent = data.teacherNote || 
       corrections.map(c => c.explanation).filter(Boolean).join(' ');
 
-    // 5. Positive Note (tailored to count)
+    // 6. Positive Note (tailored to count)
     teacherPositiveStamp.textContent = data.positiveNote || 
       (corrections.length === 1 ? "Good sentence — just one correction." : `Good effort — ${corrections.length} small corrections.`);
     
-    // 6. If result came from offline fallback rules, show subtle notice badge
+    // 7. If result came from offline fallback rules, show subtle notice badge
     if (data.status === 'fallback' && teacherNoteNotice) {
       teacherNoteNotice.textContent = data.notice || "✎ AI checking is temporarily unavailable. These corrections were found by offline rules.";
       teacherNoteNotice.classList.remove('hidden');
@@ -665,31 +684,38 @@ function renderCorrectionView(data) {
 }
 
 /**
- * Ensures adjacent handwritten replacement words always have clear horizontal clearance
- * while keeping each correction strictly centered over its original word.
+ * Ensures replacement words align directly above original words,
+ * prevent adjacent collision via vertical staggering, and stay within notebook margins on narrow screens.
  */
 function adjustCorrectionClearance() {
   const tokens = Array.from(correctionSentence.querySelectorAll('.correction-token'));
   if (!tokens.length) return;
 
-  // Pass 1: Ensure each token has enough symmetric margin so its replacement word has clearance
+  const containerRect = correctionSentence.getBoundingClientRect();
+  const minLeft = containerRect.left + 2;
+  const maxRight = containerRect.right - 2;
+
+  // Measure bounding rects to clamp edge overflow on narrow mobile screens
   tokens.forEach(token => {
     const above = token.querySelector('.correction-above');
-    const word = token.querySelector('.mistake-word');
-    if (!above || !word) return;
+    if (!above) return;
 
-    const aboveW = above.offsetWidth || above.scrollWidth;
-    const wordW = word.offsetWidth || word.scrollWidth;
+    // Reset transform to base state
+    const isStaggered = token.classList.contains('stagger-up');
+    const baseRotate = isStaggered ? -1 : -2;
+    above.style.transform = `translateX(-50%) rotate(${baseRotate}deg)`;
 
-    if (aboveW > wordW) {
-      const halfDiff = (aboveW - wordW) / 2;
-      const pad = Math.ceil(halfDiff) + 6;
-      token.style.marginLeft = `${pad}px`;
-      token.style.marginRight = `${pad}px`;
+    const rect = above.getBoundingClientRect();
+    if (rect.left < minLeft) {
+      const shiftX = Math.round(minLeft - rect.left);
+      above.style.transform = `translateX(calc(-50% + ${shiftX}px)) rotate(${baseRotate}deg)`;
+    } else if (rect.right > maxRight) {
+      const shiftX = Math.round(rect.right - maxRight);
+      above.style.transform = `translateX(calc(-50% - ${shiftX}px)) rotate(${baseRotate}deg)`;
     }
   });
 
-  // Pass 2: Measure exact rendered bounding rects to prevent any adjacent overlap
+  // For multiple adjacent corrections on the same line, ensure vertical stagger if horizontal boxes overlap
   for (let i = 0; i < tokens.length - 1; i++) {
     const curr = tokens[i];
     const next = tokens[i + 1];
@@ -700,17 +726,14 @@ function adjustCorrectionClearance() {
     const currRect = currAbove.getBoundingClientRect();
     const nextRect = nextAbove.getBoundingClientRect();
 
-    // Only apply clearance adjustments if tokens are on the same vertical line
-    const isSameLine = Math.abs(currRect.top - nextRect.top) < 22;
-    if (!isSameLine) continue;
-
-    const gap = nextRect.left - currRect.right;
-    if (gap < 14) {
-      const needed = Math.ceil((14 - gap) / 2);
-      const currMr = parseFloat(curr.style.marginRight) || 0;
-      const nextMl = parseFloat(next.style.marginLeft) || 0;
-      curr.style.marginRight = `${currMr + needed}px`;
-      next.style.marginLeft = `${nextMl + needed}px`;
+    const isSameLine = Math.abs(currRect.top - nextRect.top) < 28;
+    if (isSameLine) {
+      const horizontalOverlap = currRect.right >= nextRect.left - 4;
+      if (horizontalOverlap) {
+        if (!next.classList.contains('stagger-up') && !curr.classList.contains('stagger-up')) {
+          next.classList.add('stagger-up');
+        }
+      }
     }
   }
 }

@@ -43,8 +43,12 @@
   position: relative;
   z-index: 3;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
+  row-gap: 4px;
+  column-gap: 16px;
+  line-height: 1.35;
   padding: 10px 14px 8px 46px;
   border-bottom: 2px solid var(--color-rule-line);
   font-family: var(--font-teacher);
@@ -52,6 +56,15 @@
   color: var(--color-ink-subtle);
   background-color: rgba(251, 248, 241, 0.95);
   user-select: none;
+}
+
+@media (max-width: 480px) {
+  .notebook-header {
+    flex-direction: column;
+    align-items: flex-start;
+    row-gap: 3px;
+    padding: 8px 14px 8px 44px;
+  }
 }
 
 @media (min-width: 640px) {
@@ -248,7 +261,7 @@
   line-height: 72px; /* Generous line height so corrections comfortably float above words */
   color: var(--color-ink-student);
   letter-spacing: -0.01em;
-  padding-top: 24px; /* Generous room so first line correction never clips against header */
+  padding-top: 28px; /* Generous room so first line correction never clips against header */
   padding-bottom: 8px;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -265,7 +278,7 @@
   .sentence-correction-view {
     font-size: 1.5rem;
     line-height: 76px;
-    padding-top: 26px;
+    padding-top: 30px;
   }
 }
 
@@ -284,15 +297,16 @@
   position: relative;
   display: inline-block;
   color: var(--color-ink-student);
+  white-space: nowrap;
 }
 
-/* Hand-drawn Red Strike Through - covers the exact word with subtle natural pen stroke */
+/* Hand-drawn Red Strike Through - covers ONLY the exact word */
 .mistake-word::after {
   content: '';
   position: absolute;
-  left: -2px;
-  right: -2px;
-  top: 50%;
+  left: 0;
+  right: 0;
+  top: 52%;
   height: 2px;
   background-color: var(--color-ink-teacher);
   border-radius: 2px;
@@ -327,13 +341,13 @@
   user-select: none;
   line-height: 1;
   letter-spacing: 0.01em;
-  opacity: 0;
-  animation: teacherInkIn 0.3s 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 1;
+  animation: teacherInkIn 0.22s ease-out forwards;
 }
 
 /* Alternate stagger height for adjacent corrections so they never overlap */
 .correction-token.stagger-up .correction-above {
-  bottom: calc(100% + 7px);
+  bottom: calc(100% + 20px);
   transform: translateX(-50%) rotate(-1deg);
 }
 
@@ -343,7 +357,7 @@
     bottom: calc(100% + 3px);
   }
   .correction-token.stagger-up .correction-above {
-    bottom: calc(100% + 8px);
+    bottom: calc(100% + 22px);
   }
 }
 
