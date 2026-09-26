@@ -60,13 +60,14 @@ export async function checkEnglishWithAI(text) {
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
-  // Global safety timeout of 14 seconds to ensure request never hangs indefinitely
+  // Global safety timeout of 35 seconds to ensure request never hangs indefinitely
+  let overallTimeoutId;
   const overallTimeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => {
+    overallTimeoutId = setTimeout(() => {
       const timeoutErr = new Error("AI check timed out");
       timeoutErr.name = "TimeoutError";
       reject(timeoutErr);
-    }, 14000);
+    }, 35000);
   });
 
   const performCheck = async () => {
@@ -105,6 +106,8 @@ export async function checkEnglishWithAI(text) {
   } catch (err) {
     console.warn(`[TeacherCheck Server] Overall check timeout or error: ${err.name || 'Unknown'}`);
     return handleAIFailure(text, err);
+  } finally {
+    clearTimeout(overallTimeoutId);
   }
 }
 
@@ -171,7 +174,7 @@ async function callGeminiAPI(text, apiKey) {
           "x-goog-api-key": apiKey
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(30000)
       });
 
       if (!response.ok) {
@@ -225,8 +228,8 @@ async function callGeminiAPI(text, apiKey) {
       return normalizeCorrectionResponse(text, parsed);
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-        console.warn(`[TeacherCheck Diagnostics] Model: ${model} | HTTP Status: Timeout | Provider Code/Status: timeout | Message: Request timed out after 10s`);
-        lastError = new Error(`Model ${model} timed out after 10s`);
+        console.warn(`[TeacherCheck Diagnostics] Model: ${model} | HTTP Status: Timeout | Provider Code/Status: timeout | Message: Request timed out after 30s`);
+        lastError = new Error(`Model ${model} timed out after 30s`);
         continue;
       }
       throw err;

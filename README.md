@@ -18,7 +18,7 @@ Unlike generic AI rewriters that sanitize your text into sterile corporate prose
   - IP-based sliding window rate limiter on `/api/check`
   - Strict input validation (10KB payload limit, string typing, 600-character cap)
   - Content Security Policy (CSP), clickjacking protection (`X-Frame-Options: DENY`), `X-Content-Type-Options: nosniff`
-  - 10-second provider timeout with offline rule fallback
+  - 30-second provider timeout with offline rule fallback
   - Standalone production Node.js server (`server/prodServer.js`) with SPA routing for `/app`
 
 ---
