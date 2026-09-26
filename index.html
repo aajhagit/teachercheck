@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="/src/styles/notebook.css">
   <link rel="stylesheet" href="/src/styles/main.css">
   <link rel="stylesheet" href="/src/styles/landing.css">
+  <link rel="stylesheet" href="/src/styles/legal.css">
 </head>
 <body>
 
@@ -250,8 +251,8 @@
       <div class="footer-brand">TeacherCheck</div>
       <p class="footer-tagline">&ldquo;Your words. Your personality. Just fix the English.&rdquo;</p>
       <div class="footer-links">
-        <button type="button" class="footer-link" id="linkPrivacy">Privacy</button>
-        <button type="button" class="footer-link" id="linkTerms">Terms</button>
+        <a href="/privacy" class="footer-link" id="linkPrivacy" data-route="/privacy">Privacy Policy</a>
+        <a href="/terms" class="footer-link" id="linkTerms" data-route="/terms">Terms of Service</a>
         <button type="button" class="footer-link" id="linkContact">Contact</button>
       </div>
     </footer>
@@ -432,6 +433,332 @@
     <!-- Footer inside app -->
     <footer class="app-footer">
       <p>TeacherCheck &bull; Old-school corrections for modern English learners</p>
+      <div class="app-footer-links">
+        <a href="/privacy" class="app-footer-link" data-route="/privacy">Privacy Policy</a>
+        <span class="footer-sep">&bull;</span>
+        <a href="/terms" class="app-footer-link" data-route="/terms">Terms of Service</a>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 3. PUBLIC PRIVACY POLICY VIEW (Active on /privacy)            -->
+  <!-- ============================================================ -->
+  <div id="privacyView" class="legal-container hidden">
+    <!-- Header Navigation -->
+    <header class="legal-nav">
+      <a href="/" class="legal-nav-back" data-route="/">
+        &larr; Back to Home
+      </a>
+      <a href="/" class="landing-brand" data-route="/">
+        <svg class="logo-pen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+          <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18"/>
+          <path d="M2 2l7.586 7.586"/>
+          <circle cx="11" cy="11" r="2"/>
+        </svg>
+        <span class="landing-brand-title">TeacherCheck</span>
+      </a>
+      <a href="/app" class="legal-nav-cta" data-route="/app">
+        Open App &rarr;
+      </a>
+    </header>
+
+    <!-- Main Sheet -->
+    <main class="legal-sheet">
+      <div class="legal-sheet-header">
+        <span class="legal-badge">Privacy Policy</span>
+        <span class="legal-date">Last Updated: September 2026</span>
+      </div>
+
+      <h1 class="legal-title">Privacy Policy</h1>
+
+      <div class="legal-summary-box">
+        <div class="legal-teacher-intro">✎ Teacher's note:</div>
+        <p class="legal-summary-text">
+          <strong>&ldquo;Your words. Your personality. Just fix the English.&rdquo;</strong> We respect your writing. TeacherCheck is designed to check grammar mistakes in your sentences without storing your writing permanently or selling your personal data.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">1. Overview & Purpose</h2>
+        <p class="legal-paragraph">
+          TeacherCheck is an educational English grammar checking application. This Privacy Policy describes how we handle text and technical data when you visit our website or submit sentences for grammar review.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">2. Text You Submit for Grammar Checking</h2>
+        <p class="legal-paragraph">
+          When you use TeacherCheck, you can enter English sentences or paragraphs (up to 500 characters in the notebook editor, 600 characters maximum via API) to receive grammar corrections, word replacements, and constructive feedback.
+        </p>
+        <ul class="legal-list">
+          <li class="legal-list-item">
+            <strong>In-Flight Processing by AI Provider:</strong> To analyze your sentence and identify genuine grammatical mistakes, your submitted text is securely transmitted over encrypted HTTPS to our AI service provider (Google Gemini API). The AI provider processes the text in real time to generate suggested corrections and teacher notes.
+          </li>
+          <li class="legal-list-item">
+            <strong>No Permanent Server Storage:</strong> TeacherCheck does <strong>not</strong> permanently store your submitted sentences, essays, or personal text in any server database, log archive, or long-term file storage. Once the grammar analysis is complete, the results are returned directly to your browser.
+          </li>
+          <li class="legal-list-item">
+            <strong>Browser Local Drafts:</strong> For your typing convenience, your active sentence may be saved locally within your own browser using standard Web Storage (<code>localStorage</code> under <code>teachercheck_user_draft</code>). This text remains strictly on your device, is never synchronized to our servers, and can be cleared at any time by clicking &ldquo;Try another sentence&rdquo; or clearing browser site data.
+          </li>
+        </ul>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">3. Diagnostic Logging & Security Telemetry</h2>
+        <p class="legal-paragraph">
+          To maintain service stability, prevent automated abuse, and debug connectivity issues, our production servers record minimal operational telemetry:
+        </p>
+        <ul class="legal-list">
+          <li class="legal-list-item">
+            <strong>Safe Request Telemetry:</strong> We record timestamp, HTTP response status, total request duration in milliseconds, character length of submitted text, and count of corrections returned.
+          </li>
+          <li class="legal-list-item">
+            <strong>Zero Text Logging:</strong> Our server diagnostic logging explicitly redacts and excludes user-submitted text and API keys. We do not record or view the contents of your writing in operational logs.
+          </li>
+          <li class="legal-list-item">
+            <strong>Abuse Prevention:</strong> IP-based rate limiting is applied in memory to protect the service against denial-of-service attempts. IP counters reset automatically.
+          </li>
+        </ul>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">4. Accounts, Tracking & Cookies</h2>
+        <p class="legal-paragraph">
+          TeacherCheck is built to be simple and privacy-conscious:
+        </p>
+        <ul class="legal-list">
+          <li class="legal-list-item">
+            <strong>No User Accounts:</strong> You do not need to register, log in, or provide an email address, password, or profile information to check your English.
+          </li>
+          <li class="legal-list-item">
+            <strong>No Payment Information:</strong> TeacherCheck does not collect credit card numbers, billing addresses, or banking details.
+          </li>
+          <li class="legal-list-item">
+            <strong>No Advertising or Cross-Site Tracking:</strong> We do not run advertising networks, third-party analytics trackers, or commercial profiling cookies.
+          </li>
+        </ul>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">5. Important Educational Disclaimer</h2>
+        <div class="legal-notice-callout">
+          <p>
+            <strong>Advisory Notice:</strong> TeacherCheck is an English grammar assistance and learning tool. It is <strong>not</strong> a professional writing, legal, medical, financial, or certified translation advisory service. Because text is transmitted over the internet to automated AI models, please do not submit sensitive personal identifiers, confidential medical records, passwords, or classified business information.
+          </p>
+        </div>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">6. Third-Party Infrastructure</h2>
+        <p class="legal-paragraph">
+          Our application is hosted on cloud infrastructure (Render) and integrates with Google's generative language API for grammar analysis. These providers process network traffic and API requests in accordance with their respective security and service commitments.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">7. Changes to This Privacy Policy</h2>
+        <p class="legal-paragraph">
+          We may update this Privacy Policy periodically to reflect service updates or technical changes. Any revisions will be published on this page with an updated &ldquo;Last Updated&rdquo; date.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">8. Contact Us</h2>
+        <p class="legal-paragraph">
+          If you have questions, comments, or concerns regarding this Privacy Policy or how TeacherCheck operates, please reach out to:
+        </p>
+        <p class="legal-paragraph">
+          <strong>Email:</strong> <a href="mailto:hello@teachercheck.app" style="color: var(--color-ink-teacher);">hello@teachercheck.app</a>
+        </p>
+      </div>
+
+      <!-- Footer switch -->
+      <div class="legal-footer-nav">
+        <div class="legal-footer-switch">
+          Looking for terms of use? Read our <a href="/terms" data-route="/terms">Terms of Service</a>.
+        </div>
+        <a href="/app" class="primary-cta-btn" data-route="/app" style="padding: 10px 20px; font-size: 14px;">
+          Start Checking English &rarr;
+        </a>
+      </div>
+    </main>
+
+    <!-- Page Footer -->
+    <footer class="landing-footer">
+      <div class="footer-brand">TeacherCheck</div>
+      <p class="footer-tagline">&ldquo;Your words. Your personality. Just fix the English.&rdquo;</p>
+      <div class="footer-links">
+        <a href="/" class="footer-link" data-route="/">Home</a>
+        <a href="/app" class="footer-link" data-route="/app">Open App</a>
+        <a href="/privacy" class="footer-link" data-route="/privacy">Privacy Policy</a>
+        <a href="/terms" class="footer-link" data-route="/terms">Terms of Service</a>
+        <button type="button" class="footer-link footer-contact-btn">Contact</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 4. PUBLIC TERMS OF SERVICE VIEW (Active on /terms)             -->
+  <!-- ============================================================ -->
+  <div id="termsView" class="legal-container hidden">
+    <!-- Header Navigation -->
+    <header class="legal-nav">
+      <a href="/" class="legal-nav-back" data-route="/">
+        &larr; Back to Home
+      </a>
+      <a href="/" class="landing-brand" data-route="/">
+        <svg class="logo-pen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+          <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18"/>
+          <path d="M2 2l7.586 7.586"/>
+          <circle cx="11" cy="11" r="2"/>
+        </svg>
+        <span class="landing-brand-title">TeacherCheck</span>
+      </a>
+      <a href="/app" class="legal-nav-cta" data-route="/app">
+        Open App &rarr;
+      </a>
+    </header>
+
+    <!-- Main Sheet -->
+    <main class="legal-sheet">
+      <div class="legal-sheet-header">
+        <span class="legal-badge">Terms of Service</span>
+        <span class="legal-date">Last Updated: September 2026</span>
+      </div>
+
+      <h1 class="legal-title">Terms of Service</h1>
+
+      <div class="legal-summary-box">
+        <div class="legal-teacher-intro">✎ Teacher's note:</div>
+        <p class="legal-summary-text">
+          TeacherCheck is built to help you learn and write with confidence. You keep ownership of everything you write, and we provide automated red-pen feedback to help catch genuine grammar mistakes.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">1. Acceptance of Terms</h2>
+        <p class="legal-paragraph">
+          By visiting, accessing, or using TeacherCheck (the &ldquo;Service&rdquo;), you agree to be bound by these Terms of Service (&ldquo;Terms&rdquo;). If you do not agree to these Terms, please do not use the Service.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">2. Description of the Service</h2>
+        <p class="legal-paragraph">
+          TeacherCheck is an interactive English grammar checking application styled after a school teacher's notebook corrections. Users can enter English sentences or paragraphs to identify objective grammar errors (such as subject-verb agreement, irregular verb forms, and tense mismatches) with visual red-pen strike-throughs and word-above corrections, while preserving authentic informal expressions and personal tone.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">3. Permitted Use & User Conduct</h2>
+        <p class="legal-paragraph">
+          You may use TeacherCheck for lawful educational, personal, or professional drafting purposes. When using the Service, you agree not to:
+        </p>
+        <ul class="legal-list">
+          <li class="legal-list-item">
+            Attempt to bypass, disable, or tamper with our rate limiting, security headers, or request payload limits.
+          </li>
+          <li class="legal-list-item">
+            Use automated scrapers, scripts, or botnets to flood the check endpoint or degrade service performance for others.
+          </li>
+          <li class="legal-list-item">
+            Submit text containing malware, malicious exploits, or unlawful content.
+          </li>
+          <li class="legal-list-item">
+            Reverse engineer or abuse the underlying infrastructure.
+          </li>
+        </ul>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">4. AI-Powered Corrections & Educational Guidance</h2>
+        <p class="legal-paragraph">
+          Grammar corrections, explanations, and teacher notes are generated using automated artificial intelligence (AI) models and rule-based heuristics. While TeacherCheck is engineered to provide accurate, high-quality grammar guidance:
+        </p>
+        <ul class="legal-list">
+          <li class="legal-list-item">
+            Language models may occasionally misinterpret context, slang, regional dialects, or complex syntax.
+          </li>
+          <li class="legal-list-item">
+            Suggestions should be treated as educational guidance and recommendations, not infallible determinations of correctness.
+          </li>
+        </ul>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">5. Specialized Advisory Disclaimer (Not Professional Advice)</h2>
+        <div class="legal-notice-callout">
+          <p>
+            <strong>IMPORTANT DISCLAIMER:</strong> TeacherCheck is an English grammar checking and learning tool. It is <strong>NOT</strong> a professional writing, copyediting, legal, medical, financial, or specialized advisory service.
+          </p>
+          <p style="margin-top: 8px;">
+            The corrections and feedback provided by TeacherCheck do not constitute professional advice or official endorsement. You are solely responsible for reviewing, verifying, and deciding whether to use or publish any text checked by the Service. Never rely exclusively on TeacherCheck for legally binding agreements, regulatory documents, medical records, or safety-critical communications.
+          </p>
+        </div>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">6. Intellectual Property & Your Words</h2>
+        <p class="legal-paragraph">
+          <strong>Your words stay yours.</strong> You retain complete ownership and intellectual property rights in the text you submit to TeacherCheck. We claim no copyright, title, or ownership over your original writing or the corrected output.
+        </p>
+        <p class="legal-paragraph">
+          TeacherCheck's branding, notebook interface, visual styles, handwritten annotations, and application code are protected by copyright and intellectual property laws.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">7. Disclaimer of Warranties & Limitation of Liability</h2>
+        <p class="legal-paragraph">
+          The Service is provided on an <strong>&ldquo;AS IS&rdquo;</strong> and <strong>&ldquo;AS AVAILABLE&rdquo;</strong> basis without warranties of any kind, either express or implied, including but not limited to implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
+        </p>
+        <p class="legal-paragraph">
+          To the maximum extent permitted by applicable law, TeacherCheck, its creators, and operators shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your access to or use of (or inability to use) the Service.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">8. Modifications to the Service and Terms</h2>
+        <p class="legal-paragraph">
+          We reserve the right to update, modify, or discontinue features of TeacherCheck at any time. Any changes to these Terms will be posted on this page with an updated effective date. Continued use of the Service following modifications constitutes your acceptance of the updated Terms.
+        </p>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">9. Contact Information</h2>
+        <p class="legal-paragraph">
+          For any questions or inquiries regarding these Terms of Service, please reach us at:
+        </p>
+        <p class="legal-paragraph">
+          <strong>Email:</strong> <a href="mailto:hello@teachercheck.app" style="color: var(--color-ink-teacher);">hello@teachercheck.app</a>
+        </p>
+      </div>
+
+      <!-- Footer switch -->
+      <div class="legal-footer-nav">
+        <div class="legal-footer-switch">
+          Want to know how your data is handled? Read our <a href="/privacy" data-route="/privacy">Privacy Policy</a>.
+        </div>
+        <a href="/app" class="primary-cta-btn" data-route="/app" style="padding: 10px 20px; font-size: 14px;">
+          Start Checking English &rarr;
+        </a>
+      </div>
+    </main>
+
+    <!-- Page Footer -->
+    <footer class="landing-footer">
+      <div class="footer-brand">TeacherCheck</div>
+      <p class="footer-tagline">&ldquo;Your words. Your personality. Just fix the English.&rdquo;</p>
+      <div class="footer-links">
+        <a href="/" class="footer-link" data-route="/">Home</a>
+        <a href="/app" class="footer-link" data-route="/app">Open App</a>
+        <a href="/privacy" class="footer-link" data-route="/privacy">Privacy Policy</a>
+        <a href="/terms" class="footer-link" data-route="/terms">Terms of Service</a>
+        <button type="button" class="footer-link footer-contact-btn">Contact</button>
+      </div>
     </footer>
   </div>
 

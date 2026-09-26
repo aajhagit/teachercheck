@@ -41,6 +41,8 @@ const editSentenceBtn = document.getElementById('editSentenceBtn');
 // Landing View & Routing Elements
 const landingView = document.getElementById('landingView');
 const appView = document.getElementById('appView');
+const privacyView = document.getElementById('privacyView');
+const termsView = document.getElementById('termsView');
 const heroCtaBtn = document.getElementById('heroCtaBtn');
 const navCtaBtn = document.getElementById('navCtaBtn');
 const sectionCtaBtn = document.getElementById('sectionCtaBtn');
@@ -288,33 +290,59 @@ function attachEventListeners() {
     handleRoute();
   });
 
-  // Modal Listeners
+  // Modal & Global Navigation Listeners
   if (linkPrivacy) {
-    linkPrivacy.addEventListener('click', () => {
-      openModal(
-        "Privacy Policy",
-        "<p><strong>Your words stay yours.</strong> TeacherCheck does not sell your sentences, collect personal identifying data, or train public AI models on your private writing.</p><p style='margin-top: 12px;'>Text submitted for grammar checking is processed securely through encrypted API requests and is never stored permanently on our servers.</p>"
-      );
+    linkPrivacy.addEventListener('click', (e) => {
+      e.preventDefault();
+      showPrivacyView(true);
     });
   }
 
   if (linkTerms) {
-    linkTerms.addEventListener('click', () => {
-      openModal(
-        "Terms of Service",
-        "<p>TeacherCheck is an educational grammar tool designed to help you catch genuine English mistakes while preserving your authentic voice and casual expressions.</p><p style='margin-top: 12px;'>Use it freely for personal, academic, or professional drafts. Grammar and tone recommendations are provided as learning guidance.</p>"
-      );
+    linkTerms.addEventListener('click', (e) => {
+      e.preventDefault();
+      showTermsView(true);
     });
   }
 
   if (linkContact) {
-    linkContact.addEventListener('click', () => {
+    linkContact.addEventListener('click', (e) => {
+      e.preventDefault();
       openModal(
         "Contact TeacherCheck",
         "<p>Have a question, feedback, or a unique grammar suggestion for the teacher?</p><p style='margin-top: 12px;'>Reach us directly at <strong>hello@teachercheck.app</strong>. We read and appreciate every note from writers and learners.</p>"
       );
     });
   }
+
+  // Handle in-page routing clicks for data-route links
+  document.addEventListener('click', (e) => {
+    const routeEl = e.target.closest('[data-route]');
+    if (routeEl) {
+      const targetRoute = routeEl.getAttribute('data-route');
+      if (targetRoute === '/privacy') {
+        e.preventDefault();
+        showPrivacyView(true);
+      } else if (targetRoute === '/terms') {
+        e.preventDefault();
+        showTermsView(true);
+      } else if (targetRoute === '/app') {
+        e.preventDefault();
+        showAppView(true);
+      } else if (targetRoute === '/') {
+        e.preventDefault();
+        showLandingView(true);
+      }
+    }
+
+    if (e.target.closest('.footer-contact-btn')) {
+      e.preventDefault();
+      openModal(
+        "Contact TeacherCheck",
+        "<p>Have a question, feedback, or a unique grammar suggestion for the teacher?</p><p style='margin-top: 12px;'>Reach us directly at <strong>hello@teachercheck.app</strong>. We read and appreciate every note from writers and learners.</p>"
+      );
+    }
+  });
 
   if (modalCloseBtn) {
     modalCloseBtn.addEventListener('click', closeModal);
@@ -334,11 +362,74 @@ function attachEventListeners() {
 }
 
 /**
+ * Page Metadata Management
+ */
+const PAGE_META = {
+  landing: {
+    title: "TeacherCheck — Fix Your English, Keep Your Voice",
+    description: "Check your English without rewriting your personality. TeacherCheck corrects genuine mistakes and keeps your words yours."
+  },
+  app: {
+    title: "TeacherCheck — Red Pen Grammar Correction",
+    description: "Submit English sentences for instant, teacher-style red-pen grammar feedback while keeping your authentic tone."
+  },
+  privacy: {
+    title: "Privacy Policy — TeacherCheck",
+    description: "Read the TeacherCheck Privacy Policy. Learn how your English text is processed for grammar checking and how your privacy is protected."
+  },
+  terms: {
+    title: "Terms of Service — TeacherCheck",
+    description: "Read the TeacherCheck Terms of Service. Understand terms of use, educational guidance disclaimers, and service conditions."
+  }
+};
+
+function updatePageMeta(pageKey) {
+  const meta = PAGE_META[pageKey];
+  if (!meta) return;
+  document.title = meta.title;
+  const metaDesc = document.querySelector('meta[name="description"]');
+  if (metaDesc) {
+    metaDesc.setAttribute('content', meta.description);
+  }
+}
+
+/**
  * Navigation View Handlers
  */
+function showPrivacyView(push = true) {
+  if (landingView) landingView.classList.add('hidden');
+  if (appView) appView.classList.add('hidden');
+  if (termsView) termsView.classList.add('hidden');
+  if (privacyView) privacyView.classList.remove('hidden');
+  updatePageMeta('privacy');
+  if (push && window.location.pathname !== '/privacy') {
+    try {
+      window.history.pushState({ view: 'privacy' }, '', '/privacy');
+    } catch {}
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showTermsView(push = true) {
+  if (landingView) landingView.classList.add('hidden');
+  if (appView) appView.classList.add('hidden');
+  if (privacyView) privacyView.classList.add('hidden');
+  if (termsView) termsView.classList.remove('hidden');
+  updatePageMeta('terms');
+  if (push && window.location.pathname !== '/terms') {
+    try {
+      window.history.pushState({ view: 'terms' }, '', '/terms');
+    } catch {}
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function showAppView(push = true) {
   if (landingView) landingView.classList.add('hidden');
+  if (privacyView) privacyView.classList.add('hidden');
+  if (termsView) termsView.classList.add('hidden');
   if (appView) appView.classList.remove('hidden');
+  updatePageMeta('app');
   if (push && window.location.pathname !== '/app') {
     try {
       window.history.pushState({ view: 'app' }, '', '/app');
@@ -353,7 +444,10 @@ function showAppView(push = true) {
 
 function showLandingView(push = true) {
   if (appView) appView.classList.add('hidden');
+  if (privacyView) privacyView.classList.add('hidden');
+  if (termsView) termsView.classList.add('hidden');
   if (landingView) landingView.classList.remove('hidden');
+  updatePageMeta('landing');
   if (push && window.location.pathname !== '/') {
     try {
       window.history.pushState({ view: 'landing' }, '', '/');
@@ -363,11 +457,15 @@ function showLandingView(push = true) {
 }
 
 function handleRoute() {
-  const path = window.location.pathname;
+  const path = window.location.pathname.replace(/\/+$/, '');
   const hash = window.location.hash;
   const search = window.location.search;
 
-  if (path === '/app' || hash === '#app' || search.includes('app=1')) {
+  if (path === '/privacy' || hash === '#privacy') {
+    showPrivacyView(false);
+  } else if (path === '/terms' || hash === '#terms') {
+    showTermsView(false);
+  } else if (path === '/app' || hash === '#app' || search.includes('app=1')) {
     showAppView(false);
   } else {
     showLandingView(false);
