@@ -508,6 +508,11 @@ async function handleCheck() {
     switchToCorrection();
     requestAnimationFrame(() => {
       adjustCorrectionClearance();
+      if (document.fonts?.ready) {
+        document.fonts.ready.then(() => {
+          adjustCorrectionClearance();
+        });
+      }
     });
   } catch (err) {
     console.error('[TeacherCheck Error]', err);
@@ -626,13 +631,6 @@ function renderCorrectionView(data) {
       const tokenContainer = document.createElement('span');
       tokenContainer.className = 'correction-token';
 
-      // For multiple adjacent corrections (separated by small space/punctuation),
-      // alternate vertical stagger so replacement words never collide
-      const isAdjacent = lastTokenEnd >= 0 && (sliceStart - lastTokenEnd <= 4);
-      if (isAdjacent && index % 2 === 1) {
-        tokenContainer.classList.add('stagger-up');
-      }
-
       const correctionAbove = document.createElement('span');
       correctionAbove.className = 'correction-above';
       correctionAbove.textContent = corrWord;
@@ -684,8 +682,10 @@ function renderCorrectionView(data) {
 }
 
 /**
- * Ensures replacement words align directly above original words,
- * prevent adjacent collision via vertical staggering, and stay within notebook margins on narrow screens.
+ * Positions each .correction-above relative to the actual rendered .mistake-word geometry,
+ * keeps replacement words directly above incorrect words with a small natural gap,
+ * applies minimum vertical staggering only for adjacent collisions,
+ * and clamps within notebook margins on narrow screens.
  */
 function adjustCorrectionClearance() {
   const tokens = Array.from(correctionSentence.querySelectorAll('.correction-token'));
@@ -695,15 +695,67 @@ function adjustCorrectionClearance() {
   const minLeft = containerRect.left + 2;
   const maxRight = containerRect.right - 2;
 
-  // Measure bounding rects to clamp edge overflow on narrow mobile screens
+  // Small natural gap between top of mistake word and bottom of correction text
+  const naturalGap = 2;
+
+  // Pass 1: Set base vertical position relative to rendered .mistake-word geometry and reset state
+  tokens.forEach(token => {
+    const above = token.querySelector('.correction-above');
+    const mistakeWord = token.querySelector('.mistake-word');
+    if (!above || !mistakeWord) return;
+
+    token.classList.remove('stagger-up');
+    above.style.transform = 'translateX(-50%) rotate(-2deg)';
+
+    const tokenRect = token.getBoundingClientRect();
+    const wordRect = mistakeWord.getBoundingClientRect();
+
+    // Position .correction-above bottom directly above .mistake-word top with natural gap
+    const baseBottom = Math.round(tokenRect.bottom - wordRect.top + naturalGap);
+    above.style.bottom = `${baseBottom}px`;
+  });
+
+  // Pass 2: Measure adjacent horizontal boxes on the same line and apply minimum vertical stagger if overlapping
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const curr = tokens[i];
+    const next = tokens[i + 1];
+    const currAbove = curr.querySelector('.correction-above');
+    const nextAbove = next.querySelector('.correction-above');
+    const currWord = curr.querySelector('.mistake-word');
+    const nextWord = next.querySelector('.mistake-word');
+    if (!currAbove || !nextAbove || !currWord || !nextWord) continue;
+
+    const currWordRect = currWord.getBoundingClientRect();
+    const nextWordRect = nextWord.getBoundingClientRect();
+
+    // Only stagger if rendered on the exact same line
+    const isSameLine = Math.abs(currWordRect.top - nextWordRect.top) < 18;
+    if (isSameLine) {
+      const currRect = currAbove.getBoundingClientRect();
+      const nextRect = nextAbove.getBoundingClientRect();
+
+      // Check if horizontal bounding boxes overlap or touch (require at least 4px clearance)
+      const horizontalOverlap = currRect.right >= (nextRect.left - 4);
+      if (horizontalOverlap) {
+        if (!next.classList.contains('stagger-up') && !curr.classList.contains('stagger-up')) {
+          next.classList.add('stagger-up');
+          const nextTokenRect = next.getBoundingClientRect();
+          const staggerOffset = 11; // Minimum vertical stagger to eliminate collision without escaping the row
+          const staggeredBottom = Math.round(nextTokenRect.bottom - nextWordRect.top + naturalGap + staggerOffset);
+          nextAbove.style.bottom = `${staggeredBottom}px`;
+          nextAbove.style.transform = 'translateX(-50%) rotate(-1deg)';
+        }
+      }
+    }
+  }
+
+  // Pass 3: Clamp horizontal edges to prevent clipping against notebook borders
   tokens.forEach(token => {
     const above = token.querySelector('.correction-above');
     if (!above) return;
 
-    // Reset transform to base state
     const isStaggered = token.classList.contains('stagger-up');
     const baseRotate = isStaggered ? -1 : -2;
-    above.style.transform = `translateX(-50%) rotate(${baseRotate}deg)`;
 
     const rect = above.getBoundingClientRect();
     if (rect.left < minLeft) {
@@ -714,28 +766,6 @@ function adjustCorrectionClearance() {
       above.style.transform = `translateX(calc(-50% - ${shiftX}px)) rotate(${baseRotate}deg)`;
     }
   });
-
-  // For multiple adjacent corrections on the same line, ensure vertical stagger if horizontal boxes overlap
-  for (let i = 0; i < tokens.length - 1; i++) {
-    const curr = tokens[i];
-    const next = tokens[i + 1];
-    const currAbove = curr.querySelector('.correction-above');
-    const nextAbove = next.querySelector('.correction-above');
-    if (!currAbove || !nextAbove) continue;
-
-    const currRect = currAbove.getBoundingClientRect();
-    const nextRect = nextAbove.getBoundingClientRect();
-
-    const isSameLine = Math.abs(currRect.top - nextRect.top) < 28;
-    if (isSameLine) {
-      const horizontalOverlap = currRect.right >= nextRect.left - 4;
-      if (horizontalOverlap) {
-        if (!next.classList.contains('stagger-up') && !curr.classList.contains('stagger-up')) {
-          next.classList.add('stagger-up');
-        }
-      }
-    }
-  }
 }
 
 function switchToCorrection() {

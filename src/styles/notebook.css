@@ -220,11 +220,21 @@
   color: var(--color-ink-teacher-dark);
 }
 
-/* Correction Toolbar / Subtle Edit Affordance */
+/* Correction Mode Container */
+#correctionMode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Correction Toolbar / Subtle Edit Affordance (Positioned cleanly below sentence) */
 .correction-toolbar {
+  order: 2;
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 4px;
+  margin-top: 6px;
+  margin-bottom: 0;
+  user-select: none;
 }
 
 .sentence-edit-prompt {
@@ -257,14 +267,17 @@
 
 /* Sentence Display with Corrections */
 .sentence-correction-view {
+  order: 1;
   font-family: var(--font-student);
   font-size: 1.35rem;
-  line-height: 72px; /* Generous line height so corrections comfortably float above words */
+  font-weight: 400;
+  line-height: 53px; /* Strictly matches notebook 53px rule lines */
   color: var(--color-ink-student);
   letter-spacing: -0.01em;
-  padding-top: 28px; /* Generous room so first line correction never clips against header */
-  padding-bottom: 8px;
-  word-wrap: break-word;
+  padding: 0;
+  margin: 0;
+  min-height: 159px;
+  word-break: break-word;
   overflow-wrap: break-word;
   cursor: pointer;
   border-radius: 4px;
@@ -278,9 +291,15 @@
 @media (min-width: 640px) {
   .sentence-correction-view {
     font-size: 1.5rem;
-    line-height: 76px;
-    padding-top: 30px;
+    line-height: 53px;
+    padding: 0;
   }
+}
+
+.teacher-note-panel,
+.teacher-perfect-panel,
+.teacher-unavailable-panel {
+  order: 3;
 }
 
 /* Mistake Container - strictly centered, zero added margins */
@@ -291,6 +310,7 @@
   text-align: center;
   margin: 0;
   max-width: 100%;
+  line-height: normal;
 }
 
 /* Original Word Struck-Through */
@@ -299,6 +319,7 @@
   display: inline-block;
   color: var(--color-ink-student);
   white-space: nowrap;
+  line-height: normal;
 }
 
 /* Hand-drawn Red Strike Through - covers ONLY the exact word */
@@ -348,17 +369,12 @@
 
 /* Alternate stagger height for adjacent corrections so they never overlap */
 .correction-token.stagger-up .correction-above {
-  bottom: calc(100% + 12px);
   transform: translateX(-50%) rotate(-1deg);
 }
 
 @media (min-width: 640px) {
   .correction-above {
     font-size: 1.75rem;
-    bottom: calc(100% + 3px);
-  }
-  .correction-token.stagger-up .correction-above {
-    bottom: calc(100% + 14px);
   }
 }
 
