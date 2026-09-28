@@ -56,24 +56,195 @@ OUTPUT STRICT JSON ONLY:
   "positiveNote": "Encouraging remark"
 }`;
 
-export async function checkEnglishWithAI(text) {
+export const DEFAULT_RETRY_DELAYS = [2000, 5000, 10000];
+
+/**
+ * Calculates exponential backoff delay with bounded jitter.
+ * Suggested delays:
+ * - retry 1: ~2 seconds
+ * - retry 2: ~5 seconds
+ * - retry 3: ~10 seconds
+ */
+export function calculateRetryDelay(retryIndex, options = {}) {
+  const delays = options.retryDelays || DEFAULT_RETRY_DELAYS;
+  const base = delays[retryIndex] ?? delays[delays.length - 1];
+  if (options.jitter === false) {
+    return base;
+  }
+  // Bounded jitter: +/- 15% around base (e.g. 2000ms -> 1700ms - 2300ms)
+  const jitterRange = 0.15;
+  const jitterFactor = (Math.random() * 2 - 1) * jitterRange;
+  return Math.max(50, Math.round(base * (1 + jitterFactor)));
+}
+
+/**
+ * Cancellable sleep that guarantees all timers are cleaned up immediately
+ * if an abort signal is fired or when the timeout completes.
+ */
+export function cancellableSleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      return reject(signal.reason || new Error("Operation aborted"));
+    }
+
+    let timer = null;
+    let onAbort = null;
+
+    onAbort = () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      reject(signal?.reason || new Error("Operation aborted"));
+    };
+
+    if (signal) {
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    timer = setTimeout(() => {
+      if (signal && onAbort) {
+        signal.removeEventListener("abort", onAbort);
+      }
+      timer = null;
+      resolve();
+    }, ms);
+  });
+}
+
+/**
+ * Classifies Gemini provider errors to determine retryability and fallback behavior.
+ */
+export function classifyGeminiError({ status, providerStatus, message, err }) {
+  // 1. Permanent client / authentication errors: never retry, do not try other models
+  if (status === 400 || providerStatus === 'INVALID_ARGUMENT') {
+    return {
+      category: 'INVALID_REQUEST_400',
+      isTransient: false,
+      shouldRetry: false,
+      shouldTryNextModel: false
+    };
+  }
+  if (
+    status === 401 ||
+    status === 403 ||
+    providerStatus === 'UNAUTHENTICATED' ||
+    providerStatus === 'PERMISSION_DENIED'
+  ) {
+    return {
+      category: 'AUTHENTICATION_PERMISSION_ERROR',
+      isTransient: false,
+      shouldRetry: false,
+      shouldTryNextModel: false
+    };
+  }
+
+  // 2. Rate limit / Quota errors (429): preserve existing behavior (switch candidate model immediately, no backoff retry)
+  if (status === 429 || providerStatus === 'RESOURCE_EXHAUSTED') {
+    return {
+      category: 'RATE_LIMIT_429',
+      isTransient: false,
+      shouldRetry: false,
+      shouldTryNextModel: true
+    };
+  }
+
+  // 3. Model not found (404): try next candidate model without backoff retry
+  if (status === 404 || providerStatus === 'NOT_FOUND') {
+    return {
+      category: 'MODEL_NOT_FOUND_404',
+      isTransient: false,
+      shouldRetry: false,
+      shouldTryNextModel: true
+    };
+  }
+
+  // 4. Gemini 503 / UNAVAILABLE / high demand spike: transient, retry with backoff
+  const is503 =
+    status === 503 ||
+    providerStatus === 'UNAVAILABLE' ||
+    (typeof message === 'string' &&
+      /high demand|spikes in demand|temporarily unavailable|unavailable/i.test(message));
+  if (is503) {
+    return {
+      category: 'PROVIDER_UNAVAILABLE_503',
+      isTransient: true,
+      shouldRetry: true,
+      shouldTryNextModel: true
+    };
+  }
+
+  // 5. Transient provider 500 / 502 / 504 errors: retry with backoff
+  if (status === 500 || status === 502 || status === 504 || providerStatus === 'INTERNAL') {
+    return {
+      category: `PROVIDER_SERVER_ERROR_${status || '5XX'}`,
+      isTransient: true,
+      shouldRetry: true,
+      shouldTryNextModel: true
+    };
+  }
+
+  // 6. Network timeouts / connection reset / fetch failures: transient, retry with backoff
+  if (err) {
+    if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+      return {
+        category: 'TIMEOUT_ERROR',
+        isTransient: true,
+        shouldRetry: true,
+        shouldTryNextModel: true
+      };
+    }
+    const isNetwork =
+      err.code === 'ECONNRESET' ||
+      err.code === 'ETIMEDOUT' ||
+      err.code === 'EPIPE' ||
+      err.code === 'ENOTFOUND' ||
+      err.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      (err instanceof TypeError &&
+        typeof err.message === 'string' &&
+        err.message.toLowerCase().includes('fetch failed'));
+    if (isNetwork) {
+      return {
+        category: 'NETWORK_ERROR',
+        isTransient: true,
+        shouldRetry: true,
+        shouldTryNextModel: true
+      };
+    }
+  }
+
+  return {
+    category: `UNKNOWN_ERROR_${status || 'OTHER'}`,
+    isTransient: false,
+    shouldRetry: false,
+    shouldTryNextModel: false
+  };
+}
+
+export async function checkEnglishWithAI(text, options = {}) {
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
-  // Global safety timeout of 35 seconds to ensure request never hangs indefinitely
+  const abortController = new AbortController();
+  const overallTimeoutMs = options.overallTimeoutMs || 35000;
+
   let overallTimeoutId;
   const overallTimeoutPromise = new Promise((_, reject) => {
     overallTimeoutId = setTimeout(() => {
       const timeoutErr = new Error("AI check timed out");
       timeoutErr.name = "TimeoutError";
+      abortController.abort(timeoutErr);
       reject(timeoutErr);
-    }, 35000);
+    }, overallTimeoutMs);
   });
 
   const performCheck = async () => {
     if (geminiKey) {
       try {
-        const result = await callGeminiAPI(text, geminiKey);
+        const result = await callGeminiAPI(text, geminiKey, {
+          ...options,
+          signal: abortController.signal
+        });
         return {
           status: 'live',
           ...result
@@ -86,7 +257,10 @@ export async function checkEnglishWithAI(text) {
 
     if (openaiKey) {
       try {
-        const result = await callOpenAIAPI(text, openaiKey);
+        const result = await callOpenAIAPI(text, openaiKey, {
+          ...options,
+          signal: abortController.signal
+        });
         return {
           status: 'live',
           ...result
@@ -115,7 +289,7 @@ export async function checkEnglishWithAI(text) {
  * Handles AI failure by checking with safe offline rules.
  * Never claims a sentence is clean if the AI is unavailable and rules find nothing.
  */
-function handleAIFailure(text, err) {
+export function handleAIFailure(text, err) {
   const fallbackResult = fallbackRuleCheck(text);
   
   if (fallbackResult.hasCorrections) {
@@ -138,44 +312,121 @@ function handleAIFailure(text, err) {
   };
 }
 
-async function callGeminiAPI(text, apiKey) {
+export async function callGeminiAPI(text, apiKey, options = {}) {
   const envModelPresent = Boolean(process.env.GEMINI_MODEL);
   console.log(`[TeacherCheck Diagnostics] process.env.GEMINI_MODEL present: ${envModelPresent}${envModelPresent ? `, value: ${process.env.GEMINI_MODEL}` : ''}`);
 
-  // Use current official Google Gemini Flash models
-  const candidateModels = [
-    process.env.GEMINI_MODEL,
-    'gemini-3-flash-preview',
-    'gemini-3.5-flash',
-    'gemini-3.7-flash'
-  ].filter(Boolean);
+  // Use configured Gemini model or candidate Flash models
+  const candidateModels = options.candidateModels || [
+    ...new Set([
+      process.env.GEMINI_MODEL,
+      'gemini-3-flash-preview',
+      'gemini-3.5-flash',
+      'gemini-3.7-flash'
+    ].filter(Boolean))
+  ];
 
+  const maxRetriesPerModel = options.maxRetries ?? 3;
+  const retryDelays = options.retryDelays || DEFAULT_RETRY_DELAYS;
+  const maxExecutionTimeMs = options.maxExecutionTimeMs || 30000;
+  const providerTimeoutMs = options.providerTimeoutMs || 30000;
+  const fetchFn = options.fetch || fetch;
+  const signal = options.signal;
+
+  const startTime = Date.now();
   let lastError = null;
 
-  for (const model of candidateModels) {
-    console.log(`[TeacherCheck Diagnostics] Calling Gemini model: ${model}`);
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  for (let modelIndex = 0; modelIndex < candidateModels.length; modelIndex++) {
+    const model = candidateModels[modelIndex];
+    console.log(`[TeacherCheck Diagnostics] Calling Gemini model: ${model} | Total Duration: ${Date.now() - startTime}ms`);
 
-    const promptText = `${SYSTEM_PROMPT}\n\nStudent's sentence to check:\n"""${text}"""\n\nOutput JSON only:`;
+    let lastHttpStatus = null;
+    let lastCategory = null;
 
-    const payload = {
-      contents: [
-        {
-          parts: [{ text: promptText }]
+    for (let retryCount = 0; retryCount <= maxRetriesPerModel; retryCount++) {
+      if (signal?.aborted) {
+        throw signal.reason || new Error("Operation aborted");
+      }
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= maxExecutionTimeMs) {
+        console.warn(
+          `[TeacherCheck Diagnostics] Provider time budget reached (${elapsed}ms >= ${maxExecutionTimeMs}ms) | Model: ${model}`
+        );
+        break;
+      }
+
+      if (retryCount > 0) {
+        const delayMs = calculateRetryDelay(retryCount - 1, {
+          retryDelays,
+          jitter: options.jitter
+        });
+
+        if (Date.now() - startTime + delayMs >= maxExecutionTimeMs) {
+          console.warn(
+            `[TeacherCheck Diagnostics] Skipping retry delay exceeding time budget | Model: ${model} | Retry: ${retryCount} | Delay: ${delayMs}ms | Total Duration: ${Date.now() - startTime}ms`
+          );
+          break;
         }
-      ]
-    };
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30000)
-      });
+        console.warn(
+          `[TeacherCheck Diagnostics] Retry scheduled | Model: ${model} | HTTP Status: ${lastHttpStatus || 'network'} | Retry: ${retryCount}/${maxRetriesPerModel} | Category: ${lastCategory} | Delay: ${delayMs}ms | Total Duration: ${Date.now() - startTime}ms`
+        );
+
+        await cancellableSleep(delayMs, signal);
+
+        console.log(
+          `[TeacherCheck Diagnostics] Retry attempt | Model: ${model} | Retry: ${retryCount}/${maxRetriesPerModel} | Total Duration: ${Date.now() - startTime}ms`
+        );
+      }
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const promptText = `${SYSTEM_PROMPT}\n\nStudent's sentence to check:\n"""${text}"""\n\nOutput JSON only:`;
+      const payload = {
+        contents: [
+          {
+            parts: [{ text: promptText }]
+          }
+        ]
+      };
+
+      let response;
+      try {
+        const fetchSignal = signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(providerTimeoutMs)])
+          : AbortSignal.timeout(providerTimeoutMs);
+
+        response = await fetchFn(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+          },
+          body: JSON.stringify(payload),
+          signal: fetchSignal
+        });
+      } catch (err) {
+        if (signal?.aborted) {
+          throw signal.reason || err;
+        }
+
+        const classified = classifyGeminiError({ err });
+        console.warn(
+          `[TeacherCheck Diagnostics] Model: ${model} | HTTP Status: network | Retry: ${retryCount}/${maxRetriesPerModel} | Category: ${classified.category} | Message: ${err.message || 'Network error'} | Total Duration: ${Date.now() - startTime}ms`
+        );
+
+        lastError = new Error(`Model ${model} network error: ${err.message}`);
+        lastError.status = 'network';
+        lastError.category = classified.category;
+
+        if (classified.shouldRetry && retryCount < maxRetriesPerModel) {
+          lastHttpStatus = 'network';
+          lastCategory = classified.category;
+          continue;
+        }
+
+        break;
+      }
 
       if (!response.ok) {
         const status = response.status;
@@ -189,22 +440,53 @@ async function callGeminiAPI(text, apiKey) {
             providerCode = errData.error.code || null;
             providerStatus = errData.error.status || null;
             if (typeof errData.error.message === 'string') {
-              sanitizedErrorMessage = errData.error.message.split('\n')[0].substring(0, 200).replace(/key=[^&\s]+/gi, 'key=[REDACTED]');
+              sanitizedErrorMessage = errData.error.message
+                .split('\n')[0]
+                .substring(0, 200)
+                .replace(/key=[^&\s]+/gi, 'key=[REDACTED]');
             }
           }
         } catch {
           // Ignore JSON parse failures on error responses
         }
 
-        console.warn(`[TeacherCheck Diagnostics] Model: ${model} | HTTP Status: ${status} | Provider Code/Status: ${providerCode || 'none'}/${providerStatus || 'none'} | Message: ${sanitizedErrorMessage}`);
+        const classified = classifyGeminiError({
+          status,
+          providerStatus,
+          message: sanitizedErrorMessage
+        });
+
+        console.warn(
+          `[TeacherCheck Diagnostics] Model: ${model} | HTTP Status: ${status} | Retry: ${retryCount}/${maxRetriesPerModel} | Provider Code/Status: ${providerCode || 'none'}/${providerStatus || 'none'} | Category: ${classified.category} | Message: ${sanitizedErrorMessage} | Total Duration: ${Date.now() - startTime}ms`
+        );
 
         const err = new Error(`Provider HTTP ${status}: ${sanitizedErrorMessage}`);
         err.status = status;
+        err.providerStatus = providerStatus;
+        err.category = classified.category;
         lastError = err;
 
-        // If 503 (high demand spike) or 429 (rate limit), try next candidate model
-        if (status === 503 || status === 429) {
-          continue;
+        // 1. Permanent error (400, 401, 403, invalid key): immediately throw to stop all attempts
+        if (!classified.shouldRetry && !classified.shouldTryNextModel) {
+          throw err;
+        }
+
+        // 2. Non-retryable on this model (429 rate limit or 404 not found): skip to next candidate model
+        if (!classified.shouldRetry && classified.shouldTryNextModel) {
+          break;
+        }
+
+        // 3. Transient error (503, 500, 502, 504): retry if retry attempts remain
+        if (classified.shouldRetry) {
+          if (retryCount < maxRetriesPerModel) {
+            lastHttpStatus = status;
+            lastCategory = classified.category;
+            continue;
+          }
+          console.warn(
+            `[TeacherCheck Diagnostics] All retries exhausted | Model: ${model} | HTTP Status: ${status} | Retries: ${retryCount}/${maxRetriesPerModel} | Category: ${classified.category} | Total Duration: ${Date.now() - startTime}ms`
+          );
+          break;
         }
 
         throw err;
@@ -226,21 +508,23 @@ async function callGeminiAPI(text, apiKey) {
 
       const parsed = JSON.parse(cleanedJson);
       return normalizeCorrectionResponse(text, parsed);
-    } catch (err) {
-      if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-        console.warn(`[TeacherCheck Diagnostics] Model: ${model} | HTTP Status: Timeout | Provider Code/Status: timeout | Message: Request timed out after 30s`);
-        lastError = new Error(`Model ${model} timed out after 30s`);
-        continue;
-      }
-      throw err;
+    }
+
+    if (modelIndex < candidateModels.length - 1) {
+      console.log(
+        `[TeacherCheck Diagnostics] Moving to next model candidate | Previous: ${model} | Next: ${candidateModels[modelIndex + 1]} | Total Duration: ${Date.now() - startTime}ms`
+      );
     }
   }
 
   throw lastError || new Error("Failed to connect to Gemini API models");
 }
 
-async function callOpenAIAPI(text, apiKey) {
+async function callOpenAIAPI(text, apiKey, options = {}) {
   const url = "https://api.openai.com/v1/chat/completions";
+  const signal = options.signal;
+  const timeoutMs = options.providerTimeoutMs || 10000;
+  const fetchFn = options.fetch || fetch;
 
   const payload = {
     model: "gpt-4o-mini",
@@ -252,14 +536,18 @@ async function callOpenAIAPI(text, apiKey) {
     temperature: 0.1
   };
 
-  const response = await fetch(url, {
+  const fetchSignal = signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+    : AbortSignal.timeout(timeoutMs);
+
+  const response = await fetchFn(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${apiKey}`
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(10000)
+    signal: fetchSignal
   });
 
   if (!response.ok) {
