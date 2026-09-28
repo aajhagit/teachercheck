@@ -641,6 +641,50 @@ describe('6. Secondary Provider: Groq', () => {
     }
   });
 
+  it('Scenario B3: Gemini 503 with multiple candidate models hands off to Groq after 1 short retry without exhausting all candidate models', async () => {
+    const modelCalls = {};
+    let groqCallCount = 0;
+
+    const mockFetch = async (url) => {
+      if (url.includes('googleapis.com')) {
+        const match = url.match(/models\/([^:]+):generateContent/);
+        const model = match ? match[1] : 'unknown';
+        modelCalls[model] = (modelCalls[model] || 0) + 1;
+        return createMockResponse(503, SAMPLE_503_BODY);
+      }
+      if (url.includes('groq.com')) {
+        groqCallCount++;
+        return createMockResponse(200, SAMPLE_GROQ_SUCCESS_BODY);
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevGroq = process.env.GROQ_API_KEY;
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      process.env.GROQ_API_KEY = "test-groq-key";
+
+      const start = Date.now();
+      const result = await checkEnglishWithAI("She don't knows the answer.", {
+        fetch: mockFetch,
+        retryDelays: [5], // fast 5ms retry in test
+        candidateModels: ['gemini-candidate-1', 'gemini-candidate-2', 'gemini-candidate-3']
+      });
+      const duration = Date.now() - start;
+
+      assert.equal(result.status, 'live', "Result status should be 'live' from Groq");
+      assert.equal(modelCalls['gemini-candidate-1'], 2, "Active Gemini model should be called exactly twice (1 initial + 1 retry)");
+      assert.equal(modelCalls['gemini-candidate-2'], undefined, "Subsequent candidate model 2 must NOT be called when Groq is available");
+      assert.equal(modelCalls['gemini-candidate-3'], undefined, "Subsequent candidate model 3 must NOT be called when Groq is available");
+      assert.equal(groqCallCount, 1, "Groq should be called immediately as backup");
+      assert.ok(duration < 1000, `Handoff should be fast in test, took ${duration}ms`);
+    } finally {
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.GROQ_API_KEY = prevGroq;
+    }
+  });
+
   // C. Gemini fails → Groq fails → existing fallback/unavailable.
   it('Scenario C1: Gemini fails -> Groq fails -> offline fallback correction if offline error exists', async () => {
     const sentence = "I have did this yesterday.";

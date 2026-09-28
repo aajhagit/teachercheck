@@ -241,10 +241,18 @@ export async function checkEnglishWithAI(text, options = {}) {
 
   const performCheck = async () => {
     let lastError = null;
+    const hasBackupProvider = options.hasBackupProvider !== undefined
+      ? Boolean(options.hasBackupProvider)
+      : Boolean(groqKey || openaiKey);
 
     if (geminiKey) {
       try {
         const result = await callGeminiAPI(text, geminiKey, {
+          hasBackupProvider,
+          maxRetries: hasBackupProvider ? 1 : 3,
+          retryDelays: hasBackupProvider ? [2000] : DEFAULT_RETRY_DELAYS,
+          maxExecutionTimeMs: hasBackupProvider ? 8000 : 30000,
+          providerTimeoutMs: hasBackupProvider ? 6000 : 30000,
           ...options,
           signal: abortController.signal
         });
@@ -335,6 +343,8 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
   const envModelPresent = Boolean(process.env.GEMINI_MODEL);
   console.log(`[TeacherCheck Diagnostics] process.env.GEMINI_MODEL present: ${envModelPresent}${envModelPresent ? `, value: ${process.env.GEMINI_MODEL}` : ''}`);
 
+  const hasBackupProvider = Boolean(options.hasBackupProvider);
+
   // Use configured Gemini model or candidate Flash models
   const candidateModels = options.candidateModels || [
     ...new Set([
@@ -345,10 +355,10 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
     ].filter(Boolean))
   ];
 
-  const maxRetriesPerModel = options.maxRetries ?? 3;
-  const retryDelays = options.retryDelays || DEFAULT_RETRY_DELAYS;
-  const maxExecutionTimeMs = options.maxExecutionTimeMs || 30000;
-  const providerTimeoutMs = options.providerTimeoutMs || 30000;
+  const maxRetriesPerModel = options.maxRetries ?? (hasBackupProvider ? 1 : 3);
+  const retryDelays = options.retryDelays || (hasBackupProvider ? [2000] : DEFAULT_RETRY_DELAYS);
+  const maxExecutionTimeMs = options.maxExecutionTimeMs || (hasBackupProvider ? 8000 : 30000);
+  const providerTimeoutMs = options.providerTimeoutMs || (hasBackupProvider ? 6000 : 30000);
   const fetchFn = options.geminiFetch || options.fetch || fetch;
   const signal = options.signal;
 
@@ -444,6 +454,13 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
           continue;
         }
 
+        if (hasBackupProvider) {
+          console.log(
+            `[TeacherCheck Diagnostics] Fast-failing Gemini to backup provider on network error | Model: ${model} | Total Duration: ${Date.now() - startTime}ms`
+          );
+          throw lastError;
+        }
+
         break;
       }
 
@@ -505,6 +522,12 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
           console.warn(
             `[TeacherCheck Diagnostics] All retries exhausted | Model: ${model} | HTTP Status: ${status} | Retries: ${retryCount}/${maxRetriesPerModel} | Category: ${classified.category} | Total Duration: ${Date.now() - startTime}ms`
           );
+          if (hasBackupProvider) {
+            console.log(
+              `[TeacherCheck Diagnostics] Fast-failing Gemini to backup provider on ${classified.category} | Model: ${model} | Total Duration: ${Date.now() - startTime}ms`
+            );
+            throw err;
+          }
           break;
         }
 
