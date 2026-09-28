@@ -223,6 +223,7 @@ export function classifyGeminiError({ status, providerStatus, message, err }) {
 
 export async function checkEnglishWithAI(text, options = {}) {
   const geminiKey = process.env.GEMINI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
   const abortController = new AbortController();
@@ -239,6 +240,8 @@ export async function checkEnglishWithAI(text, options = {}) {
   });
 
   const performCheck = async () => {
+    let lastError = null;
+
     if (geminiKey) {
       try {
         const result = await callGeminiAPI(text, geminiKey, {
@@ -250,8 +253,24 @@ export async function checkEnglishWithAI(text, options = {}) {
           ...result
         };
       } catch (err) {
+        lastError = err;
         console.warn(`[TeacherCheck Server] Gemini provider notice: status=${err.status || err.name || 'network'}`);
-        return handleAIFailure(text, err);
+      }
+    }
+
+    if (groqKey) {
+      try {
+        const result = await callGroqAPI(text, groqKey, {
+          ...options,
+          signal: abortController.signal
+        });
+        return {
+          status: 'live',
+          ...result
+        };
+      } catch (err) {
+        lastError = err;
+        console.warn(`[TeacherCheck Server] Groq provider notice: status=${err.status || err.name || 'network'}`);
       }
     }
 
@@ -266,13 +285,13 @@ export async function checkEnglishWithAI(text, options = {}) {
           ...result
         };
       } catch (err) {
+        lastError = err;
         console.warn(`[TeacherCheck Server] OpenAI provider notice: status=${err.status || err.name || 'network'}`);
-        return handleAIFailure(text, err);
       }
     }
 
-    // No API key configured: fallback to offline rules
-    return handleAIFailure(text, new Error("Offline rule fallback"));
+    // No live provider succeeded: fallback to safe offline rules
+    return handleAIFailure(text, lastError || new Error("Offline rule fallback"));
   };
 
   try {
@@ -330,7 +349,7 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
   const retryDelays = options.retryDelays || DEFAULT_RETRY_DELAYS;
   const maxExecutionTimeMs = options.maxExecutionTimeMs || 30000;
   const providerTimeoutMs = options.providerTimeoutMs || 30000;
-  const fetchFn = options.fetch || fetch;
+  const fetchFn = options.geminiFetch || options.fetch || fetch;
   const signal = options.signal;
 
   const startTime = Date.now();
@@ -518,6 +537,132 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
   }
 
   throw lastError || new Error("Failed to connect to Gemini API models");
+}
+
+/**
+ * Classifies Groq provider errors into clean diagnostic categories.
+ */
+export function classifyGroqError({ status, message, err }) {
+  if (status === 400) {
+    return { category: 'BAD_REQUEST_400' };
+  }
+  if (status === 401 || status === 403) {
+    return { category: 'AUTH_PERMISSION_ERROR' };
+  }
+  if (status === 429) {
+    return { category: 'RATE_LIMIT_429' };
+  }
+  if (status === 503) {
+    return { category: 'PROVIDER_UNAVAILABLE_503' };
+  }
+  if (status >= 500 && status < 600) {
+    return { category: `PROVIDER_SERVER_ERROR_${status}` };
+  }
+  if (err) {
+    if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+      return { category: 'TIMEOUT_ERROR' };
+    }
+    return { category: 'NETWORK_ERROR' };
+  }
+  return { category: `UNKNOWN_ERROR_${status || 'OTHER'}` };
+}
+
+/**
+ * Secondary AI provider: Groq (OpenAI-compatible endpoint)
+ * Uses model: openai/gpt-oss-120b
+ */
+export async function callGroqAPI(text, apiKey, options = {}) {
+  const model = options.model || process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+  const url = options.url || process.env.GROQ_API_URL || "https://api.groq.com/openai/v1/chat/completions";
+  const signal = options.signal;
+  const timeoutMs = options.groqTimeoutMs || options.providerTimeoutMs || 10000;
+  const fetchFn = options.groqFetch || options.fetch || fetch;
+  const startTime = Date.now();
+
+  console.log(`[TeacherCheck Diagnostics] Calling Groq model: ${model} | Total Duration: ${Date.now() - startTime}ms`);
+
+  const payload = {
+    model,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `Student's sentence to check:\n"""${text}"""` }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.1
+  };
+
+  const fetchSignal = signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+    : AbortSignal.timeout(timeoutMs);
+
+  let response;
+  try {
+    response = await fetchFn(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: fetchSignal
+    });
+  } catch (err) {
+    if (signal?.aborted) {
+      throw signal.reason || err;
+    }
+    const classified = classifyGroqError({ err });
+    const duration = Date.now() - startTime;
+    console.warn(`[TeacherCheck Diagnostics] provider=groq | model=${model} | HTTP status=network | error category=${classified.category} | duration=${duration}ms`);
+    const error = new Error(`Groq network error: ${err.message || 'Fetch failed'}`);
+    error.status = 'network';
+    error.category = classified.category;
+    throw error;
+  }
+
+  if (!response.ok) {
+    const status = response.status;
+    let sanitizedErrorMessage = 'Unknown error';
+
+    try {
+      const errData = await response.json();
+      if (errData && errData.error && typeof errData.error.message === 'string') {
+        sanitizedErrorMessage = errData.error.message
+          .split('\n')[0]
+          .substring(0, 200)
+          .replace(/key=[^&\s]+/gi, 'key=[REDACTED]');
+      }
+    } catch {
+      // Ignore JSON parse error on non-JSON response
+    }
+
+    const classified = classifyGroqError({ status, message: sanitizedErrorMessage });
+    const duration = Date.now() - startTime;
+    console.warn(`[TeacherCheck Diagnostics] provider=groq | model=${model} | HTTP status=${status} | error category=${classified.category} | duration=${duration}ms`);
+
+    const err = new Error(`Groq HTTP ${status}: ${sanitizedErrorMessage}`);
+    err.status = status;
+    err.category = classified.category;
+    throw err;
+  }
+
+  const duration = Date.now() - startTime;
+  console.log(`[TeacherCheck Diagnostics] provider=groq | model=${model} | HTTP status=200 | duration=${duration}ms`);
+
+  const data = await response.json();
+  const rawJson = data.choices?.[0]?.message?.content;
+  if (!rawJson) {
+    throw new Error("No response content received from Groq API");
+  }
+
+  let cleanedJson = rawJson.trim();
+  if (cleanedJson.startsWith("```json")) {
+    cleanedJson = cleanedJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+  } else if (cleanedJson.startsWith("```")) {
+    cleanedJson = cleanedJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+  }
+
+  const parsed = JSON.parse(cleanedJson);
+  return normalizeCorrectionResponse(text, parsed);
 }
 
 async function callOpenAIAPI(text, apiKey, options = {}) {

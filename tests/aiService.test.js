@@ -4,7 +4,9 @@ import {
   calculateRetryDelay,
   cancellableSleep,
   classifyGeminiError,
+  classifyGroqError,
   callGeminiAPI,
+  callGroqAPI,
   checkEnglishWithAI,
   handleAIFailure,
   DEFAULT_RETRY_DELAYS
@@ -524,6 +526,288 @@ describe('5. Safe Diagnostic Logging', () => {
 
     // NEVER log sensitive details
     assert.ok(!allLogsText.includes(sensitiveKey), "Must NEVER log API key");
+    assert.ok(!allLogsText.includes(sensitiveSentence), "Must NEVER log user sentence");
+  });
+});
+
+const SAMPLE_GROQ_SUCCESS_BODY = {
+  choices: [
+    {
+      message: {
+        content: JSON.stringify({
+          corrections: [
+            {
+              original: "don't",
+              startIndex: 4,
+              endIndex: 9,
+              corrected: "doesn't",
+              explanation: "With 'she', use 'doesn't' instead of 'don't'."
+            },
+            {
+              original: "knows",
+              startIndex: 10,
+              endIndex: 15,
+              corrected: "know",
+              explanation: "After 'doesn't', use the base verb 'know'."
+            }
+          ],
+          teacherNote: "With 'she', use 'doesn't'. After 'doesn't', use base verb 'know'.",
+          positiveNote: "Good effort — 2 small corrections."
+        })
+      }
+    }
+  ]
+};
+
+describe('6. Secondary Provider: Groq', () => {
+  // A. Gemini succeeds → Groq is NOT called.
+  it('Scenario A: Gemini succeeds -> Groq is NOT called', async () => {
+    let geminiCalled = false;
+    let groqCalled = false;
+
+    const mockFetch = async (url) => {
+      if (url.includes('googleapis.com')) {
+        geminiCalled = true;
+        return createMockResponse(200, SAMPLE_SUCCESS_BODY);
+      }
+      if (url.includes('groq.com')) {
+        groqCalled = true;
+        return createMockResponse(200, SAMPLE_GROQ_SUCCESS_BODY);
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevGroq = process.env.GROQ_API_KEY;
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      process.env.GROQ_API_KEY = "test-groq-key";
+
+      const result = await checkEnglishWithAI("She don't knows the answer.", {
+        fetch: mockFetch,
+        retryDelays: [2],
+        maxRetries: 1,
+        candidateModels: ['gemini-flash-1']
+      });
+
+      assert.equal(result.status, 'live');
+      assert.equal(geminiCalled, true, "Gemini must be called");
+      assert.equal(groqCalled, false, "Groq must NOT be called when Gemini succeeds");
+    } finally {
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.GROQ_API_KEY = prevGroq;
+    }
+  });
+
+  // B. Gemini fails → Groq succeeds.
+  it('Scenario B: Gemini fails -> Groq succeeds', async () => {
+    let geminiCallCount = 0;
+    let groqCallCount = 0;
+
+    const mockFetch = async (url) => {
+      if (url.includes('googleapis.com')) {
+        geminiCallCount++;
+        return createMockResponse(503, SAMPLE_503_BODY);
+      }
+      if (url.includes('groq.com')) {
+        groqCallCount++;
+        return createMockResponse(200, SAMPLE_GROQ_SUCCESS_BODY);
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevGroq = process.env.GROQ_API_KEY;
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      process.env.GROQ_API_KEY = "test-groq-key";
+
+      const result = await checkEnglishWithAI("She don't knows the answer.", {
+        fetch: mockFetch,
+        retryDelays: [2],
+        maxRetries: 1,
+        candidateModels: ['gemini-flash-1']
+      });
+
+      assert.equal(result.status, 'live', "Result status should be 'live' from Groq");
+      assert.ok(geminiCallCount > 0, "Gemini must have been attempted");
+      assert.equal(groqCallCount, 1, "Groq must have been called exactly once as secondary fallback");
+      assert.equal(result.hasCorrections, true);
+      assert.equal(result.corrections.length, 2);
+      assert.equal(result.corrections[0].corrected, "doesn't");
+    } finally {
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.GROQ_API_KEY = prevGroq;
+    }
+  });
+
+  // C. Gemini fails → Groq fails → existing fallback/unavailable.
+  it('Scenario C1: Gemini fails -> Groq fails -> offline fallback correction if offline error exists', async () => {
+    const sentence = "I have did this yesterday.";
+    let groqCallCount = 0;
+
+    const mockFetch = async (url) => {
+      if (url.includes('googleapis.com')) {
+        return createMockResponse(503, SAMPLE_503_BODY);
+      }
+      if (url.includes('groq.com')) {
+        groqCallCount++;
+        return createMockResponse(500, { error: { message: "Internal server error" } });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevGroq = process.env.GROQ_API_KEY;
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      process.env.GROQ_API_KEY = "test-groq-key";
+
+      const result = await checkEnglishWithAI(sentence, {
+        fetch: mockFetch,
+        retryDelays: [2],
+        maxRetries: 1,
+        candidateModels: ['gemini-flash-1']
+      });
+
+      assert.equal(groqCallCount, 1, "Groq should be attempted");
+      assert.equal(result.status, 'fallback', "Should fall back to offline grammar rules");
+      assert.equal(result.hasCorrections, true);
+      assert.equal(result.corrections[0].original, 'did');
+      assert.equal(result.corrections[0].corrected, 'done');
+      assert.ok(result.notice && result.notice.includes('offline rules'));
+    } finally {
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.GROQ_API_KEY = prevGroq;
+    }
+  });
+
+  it('Scenario C2: Gemini fails -> Groq fails -> unavailable for clean sentence (never claims clean)', async () => {
+    const sentence = "I went to college today.";
+
+    const mockFetch = async (url) => {
+      if (url.includes('googleapis.com')) {
+        return createMockResponse(503, SAMPLE_503_BODY);
+      }
+      if (url.includes('groq.com')) {
+        return createMockResponse(429, { error: { message: "Rate limit reached" } });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevGroq = process.env.GROQ_API_KEY;
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      process.env.GROQ_API_KEY = "test-groq-key";
+
+      const result = await checkEnglishWithAI(sentence, {
+        fetch: mockFetch,
+        retryDelays: [2],
+        maxRetries: 1,
+        candidateModels: ['gemini-flash-1']
+      });
+
+      assert.equal(result.status, 'unavailable', "Should return unavailable status");
+      assert.equal(result.hasCorrections, false);
+      assert.equal(result.corrections.length, 0);
+      assert.ok(result.teacherNote.includes("couldn't complete the full AI check"));
+      assert.notEqual(result.positiveNote, "Your English looks good.", "Never falsely claim good English");
+    } finally {
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.GROQ_API_KEY = prevGroq;
+    }
+  });
+
+  // D. Groq response is normalized correctly.
+  it('Scenario D: Groq response is normalized correctly with exact indices and markdown stripping', async () => {
+    const rawWrappedJson = "```json\n" + JSON.stringify({
+      corrections: [
+        {
+          original: "don't",
+          startIndex: 4,
+          endIndex: 9,
+          corrected: "doesn't",
+          explanation: "With 'she', use 'doesn't'."
+        },
+        {
+          original: "knows",
+          startIndex: 10,
+          endIndex: 15,
+          corrected: "know",
+          explanation: "After 'doesn't', use base verb 'know'."
+        }
+      ],
+      teacherNote: "Use doesn't with she.",
+      positiveNote: "Good effort — 2 small corrections."
+    }) + "\n```";
+
+    const mockFetch = async () => {
+      return createMockResponse(200, {
+        choices: [{ message: { content: rawWrappedJson } }]
+      });
+    };
+
+    const result = await callGroqAPI("She don't knows the answer.", "test-key", {
+      fetch: mockFetch
+    });
+
+    assert.equal(result.originalText, "She don't knows the answer.");
+    assert.equal(result.hasCorrections, true);
+    assert.equal(result.corrections.length, 2);
+    assert.equal(result.corrections[0].original, "don't");
+    assert.equal(result.corrections[0].startIndex, 4);
+    assert.equal(result.corrections[0].endIndex, 9);
+    assert.equal(result.corrections[0].corrected, "doesn't");
+    assert.equal(result.corrections[1].original, "knows");
+    assert.equal(result.corrections[1].startIndex, 10);
+    assert.equal(result.corrections[1].endIndex, 15);
+    assert.equal(result.corrections[1].corrected, "know");
+  });
+
+  // E. API keys are never included in logs/responses.
+  it('Scenario E: Groq API key is never included in logs or responses on error or success', async () => {
+    const logs = [];
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
+
+    console.log = (...args) => logs.push(args.join(' '));
+    console.warn = (...args) => logs.push(args.join(' '));
+    console.error = (...args) => logs.push(args.join(' '));
+
+    const secretGroqKey = "gsk_test_super_secret_groq_api_key_12345";
+    const sensitiveSentence = "Confidential text for groq security test.";
+
+    const mockFetch = async () => {
+      return createMockResponse(401, {
+        error: { message: `Invalid API key key=${secretGroqKey}` }
+      });
+    };
+
+    try {
+      await assert.rejects(
+        callGroqAPI(sensitiveSentence, secretGroqKey, { fetch: mockFetch }),
+        /Groq HTTP 401/
+      );
+    } finally {
+      console.log = origLog;
+      console.warn = origWarn;
+      console.error = origError;
+    }
+
+    const allLogsText = logs.join('\n');
+
+    // Required diagnostics format
+    assert.ok(allLogsText.includes('provider=groq'), "Must include provider=groq");
+    assert.ok(allLogsText.includes('openai/gpt-oss-120b'), "Must include model");
+    assert.ok(allLogsText.includes('HTTP status=401'), "Must include HTTP status");
+    assert.ok(allLogsText.includes('error category='), "Must include error category");
+    assert.ok(allLogsText.includes('duration='), "Must include duration");
+
+    // NEVER leak secrets
+    assert.ok(!allLogsText.includes(secretGroqKey), "Must NEVER log Groq API key");
+    assert.ok(!allLogsText.includes('Authorization'), "Must NEVER log Authorization header");
     assert.ok(!allLogsText.includes(sensitiveSentence), "Must NEVER log user sentence");
   });
 });
