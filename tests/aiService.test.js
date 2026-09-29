@@ -7,6 +7,7 @@ import {
   classifyGroqError,
   callGeminiAPI,
   callGroqAPI,
+  checkGeminiHealth,
   checkEnglishWithAI,
   handleAIFailure,
   DEFAULT_RETRY_DELAYS
@@ -685,6 +686,148 @@ describe('6. Secondary Provider: Groq', () => {
     }
   });
 
+  // B4. Gemini first request times out -> retry delay cannot fit in budget -> immediate Groq
+  it('Scenario B4: Gemini timeout with retry delay exceeding remaining budget hands off to Groq without calling candidate model #2', async () => {
+    const modelCalls = {};
+    let groqCallCount = 0;
+
+    const mockFetch = async (url) => {
+      if (url.includes('googleapis.com')) {
+        const match = url.match(/models\/([^:]+):generateContent/);
+        const model = match ? match[1] : 'unknown';
+        modelCalls[model] = (modelCalls[model] || 0) + 1;
+        const timeoutErr = new Error("The operation was aborted due to timeout");
+        timeoutErr.name = "TimeoutError";
+        throw timeoutErr;
+      }
+      if (url.includes('groq.com')) {
+        groqCallCount++;
+        return createMockResponse(200, SAMPLE_GROQ_SUCCESS_BODY);
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevGroq = process.env.GROQ_API_KEY;
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      process.env.GROQ_API_KEY = "test-groq-key";
+
+      const start = Date.now();
+      const result = await checkEnglishWithAI("She don't knows the answer.", {
+        fetch: mockFetch,
+        maxExecutionTimeMs: 100, // tight 100ms budget
+        retryDelays: [250],      // 250ms retry delay exceeds 100ms budget
+        jitter: false,
+        candidateModels: ['gemini-candidate-1', 'gemini-candidate-2', 'gemini-candidate-3']
+      });
+      const duration = Date.now() - start;
+
+      assert.equal(result.status, 'live', "Result status should be 'live' from Groq");
+      assert.equal(modelCalls['gemini-candidate-1'], 1, "Active Gemini model should only be attempted once because retry delay exceeds budget");
+      assert.equal(modelCalls['gemini-candidate-2'], undefined, "Subsequent candidate model 2 must NOT be called when Groq is available");
+      assert.equal(modelCalls['gemini-candidate-3'], undefined, "Subsequent candidate model 3 must NOT be called when Groq is available");
+      assert.equal(groqCallCount, 1, "Groq should be called immediately as backup");
+      assert.ok(duration < 1000, `Handoff should be fast in test, took ${duration}ms`);
+    } finally {
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.GROQ_API_KEY = prevGroq;
+    }
+  });
+
+  // B5. Gemini 503 -> retry delay cannot fit in budget -> immediate Groq
+  it('Scenario B5: Gemini 503 with retry delay exceeding remaining budget hands off to Groq without calling candidate model #2', async () => {
+    const modelCalls = {};
+    let groqCallCount = 0;
+
+    const mockFetch = async (url) => {
+      if (url.includes('googleapis.com')) {
+        const match = url.match(/models\/([^:]+):generateContent/);
+        const model = match ? match[1] : 'unknown';
+        modelCalls[model] = (modelCalls[model] || 0) + 1;
+        return createMockResponse(503, SAMPLE_503_BODY);
+      }
+      if (url.includes('groq.com')) {
+        groqCallCount++;
+        return createMockResponse(200, SAMPLE_GROQ_SUCCESS_BODY);
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevGroq = process.env.GROQ_API_KEY;
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      process.env.GROQ_API_KEY = "test-groq-key";
+
+      const start = Date.now();
+      const result = await checkEnglishWithAI("She don't knows the answer.", {
+        fetch: mockFetch,
+        maxExecutionTimeMs: 100, // tight 100ms budget
+        retryDelays: [250],      // 250ms retry delay exceeds 100ms budget
+        jitter: false,
+        candidateModels: ['gemini-candidate-1', 'gemini-candidate-2', 'gemini-candidate-3']
+      });
+      const duration = Date.now() - start;
+
+      assert.equal(result.status, 'live', "Result status should be 'live' from Groq");
+      assert.equal(modelCalls['gemini-candidate-1'], 1, "Active Gemini model should only be attempted once because retry delay exceeds budget");
+      assert.equal(modelCalls['gemini-candidate-2'], undefined, "Subsequent candidate model 2 must NOT be called when Groq is available");
+      assert.equal(groqCallCount, 1, "Groq should be called immediately as backup");
+      assert.ok(duration < 1000, `Handoff should be fast in test, took ${duration}ms`);
+    } finally {
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.GROQ_API_KEY = prevGroq;
+    }
+  });
+
+  // B6. Gemini retry happens on transient timeout but retry also fails -> immediate Groq
+  it('Scenario B6: Gemini retry happens on timeout but retry also fails -> hands off to Groq without calling candidate model #2', async () => {
+    const modelCalls = {};
+    let groqCallCount = 0;
+
+    const mockFetch = async (url) => {
+      if (url.includes('googleapis.com')) {
+        const match = url.match(/models\/([^:]+):generateContent/);
+        const model = match ? match[1] : 'unknown';
+        modelCalls[model] = (modelCalls[model] || 0) + 1;
+        const timeoutErr = new Error("The operation was aborted due to timeout");
+        timeoutErr.name = "TimeoutError";
+        throw timeoutErr;
+      }
+      if (url.includes('groq.com')) {
+        groqCallCount++;
+        return createMockResponse(200, SAMPLE_GROQ_SUCCESS_BODY);
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const prevGemini = process.env.GEMINI_API_KEY;
+    const prevGroq = process.env.GROQ_API_KEY;
+    try {
+      process.env.GEMINI_API_KEY = "test-gemini-key";
+      process.env.GROQ_API_KEY = "test-groq-key";
+
+      const start = Date.now();
+      const result = await checkEnglishWithAI("She don't knows the answer.", {
+        fetch: mockFetch,
+        retryDelays: [5], // fits in budget
+        jitter: false,
+        candidateModels: ['gemini-candidate-1', 'gemini-candidate-2', 'gemini-candidate-3']
+      });
+      const duration = Date.now() - start;
+
+      assert.equal(result.status, 'live', "Result status should be 'live' from Groq");
+      assert.equal(modelCalls['gemini-candidate-1'], 2, "Active Gemini model should be retried once");
+      assert.equal(modelCalls['gemini-candidate-2'], undefined, "Subsequent candidate model 2 must NOT be called when Groq is available");
+      assert.equal(groqCallCount, 1, "Groq should be called immediately as backup");
+      assert.ok(duration < 1000, `Handoff should be fast in test, took ${duration}ms`);
+    } finally {
+      process.env.GEMINI_API_KEY = prevGemini;
+      process.env.GROQ_API_KEY = prevGroq;
+    }
+  });
+
   // C. Gemini fails → Groq fails → existing fallback/unavailable.
   it('Scenario C1: Gemini fails -> Groq fails -> offline fallback correction if offline error exists', async () => {
     const sentence = "I have did this yesterday.";
@@ -855,3 +998,70 @@ describe('6. Secondary Provider: Groq', () => {
     assert.ok(!allLogsText.includes(sensitiveSentence), "Must NEVER log user sentence");
   });
 });
+
+describe('7. Gemini Health Check Diagnostics', () => {
+  it('reports safe diagnostic information on successful ping without exposing secrets', async () => {
+    const mockApiKey = "AIzaSyTestGeminiKey123456789";
+    const mockFetch = async () => {
+      return createMockResponse(200, {
+        candidates: [{ content: { parts: [{ text: "pong" }] } }]
+      });
+    };
+
+    const health = await checkGeminiHealth({
+      apiKey: mockApiKey,
+      model: 'gemini-3-flash-preview',
+      fetch: mockFetch
+    });
+
+    assert.equal(health.configured, true, "Should report configured: true");
+    assert.equal(health.model, 'gemini-3-flash-preview', "Should report configured model");
+    assert.equal(health.success, true, "Should report success: true");
+    assert.equal(health.httpStatus, 200, "Should report httpStatus: 200");
+    assert.equal(health.category, 'OK', "Should report category: OK");
+    assert.ok(typeof health.durationMs === 'number', "Should report durationMs");
+
+    // Strictly verify secrets are NEVER exposed in health check result
+    const serialized = JSON.stringify(health);
+    assert.ok(!serialized.includes(mockApiKey), "Must NEVER expose Gemini API key in health check");
+    assert.ok(!serialized.includes('Authorization'), "Must NEVER expose Authorization header");
+    assert.equal(health.apiKey, undefined, "apiKey property must NOT exist on health result");
+  });
+
+  it('reports safe error category on timeout or provider error without exposing secrets', async () => {
+    const mockApiKey = "AIzaSyTestGeminiKey123456789";
+    const mockFetch = async () => {
+      const err = new Error("The operation was aborted due to timeout");
+      err.name = "TimeoutError";
+      throw err;
+    };
+
+    const health = await checkGeminiHealth({
+      apiKey: mockApiKey,
+      model: 'gemini-3.6-flash',
+      fetch: mockFetch
+    });
+
+    assert.equal(health.configured, true, "Should report configured: true");
+    assert.equal(health.model, 'gemini-3.6-flash', "Should report model name");
+    assert.equal(health.success, false, "Should report success: false");
+    assert.equal(health.category, 'TIMEOUT_ERROR', "Should report category: TIMEOUT_ERROR");
+    assert.ok(typeof health.durationMs === 'number', "Should report durationMs");
+
+    const serialized = JSON.stringify(health);
+    assert.ok(!serialized.includes(mockApiKey), "Must NEVER expose Gemini API key in health check on error");
+    assert.equal(health.apiKey, undefined, "apiKey property must NOT exist on health result");
+  });
+
+  it('reports configured: false when Gemini API key is missing', async () => {
+    const health = await checkGeminiHealth({
+      apiKey: '',
+      model: 'gemini-3-flash-preview'
+    });
+
+    assert.equal(health.configured, false, "Should report configured: false");
+    assert.equal(health.success, false, "Should report success: false");
+    assert.equal(health.category, 'NOT_CONFIGURED', "Should report category: NOT_CONFIGURED");
+  });
+});
+

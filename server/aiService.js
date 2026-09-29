@@ -345,8 +345,9 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
 
   const hasBackupProvider = Boolean(options.hasBackupProvider);
 
-  // Use configured Gemini model or candidate Flash models
-  const candidateModels = options.candidateModels || [
+  // Use configured Gemini model or candidate Flash models.
+  // When a backup provider exists, only try the active Gemini model; do not move to other candidate models.
+  const allCandidateModels = options.candidateModels || [
     ...new Set([
       process.env.GEMINI_MODEL,
       'gemini-3-flash-preview',
@@ -354,6 +355,7 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
       'gemini-3.7-flash'
     ].filter(Boolean))
   ];
+  const candidateModels = hasBackupProvider ? [allCandidateModels[0]] : allCandidateModels;
 
   const maxRetriesPerModel = options.maxRetries ?? (hasBackupProvider ? 1 : 3);
   const retryDelays = options.retryDelays || (hasBackupProvider ? [2000] : DEFAULT_RETRY_DELAYS);
@@ -382,6 +384,12 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
         console.warn(
           `[TeacherCheck Diagnostics] Provider time budget reached (${elapsed}ms >= ${maxExecutionTimeMs}ms) | Model: ${model}`
         );
+        if (hasBackupProvider) {
+          console.log(
+            `[TeacherCheck Diagnostics] Fast-failing Gemini to backup provider on time budget reached | Model: ${model} | Total Duration: ${Date.now() - startTime}ms`
+          );
+          throw lastError || new Error(`Provider time budget reached on ${model}`);
+        }
         break;
       }
 
@@ -395,6 +403,12 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
           console.warn(
             `[TeacherCheck Diagnostics] Skipping retry delay exceeding time budget | Model: ${model} | Retry: ${retryCount} | Delay: ${delayMs}ms | Total Duration: ${Date.now() - startTime}ms`
           );
+          if (hasBackupProvider) {
+            console.log(
+              `[TeacherCheck Diagnostics] Fast-failing Gemini to backup provider when retry exceeds time budget | Model: ${model} | Total Duration: ${Date.now() - startTime}ms`
+            );
+            throw lastError || new Error(`Retry delay exceeds time budget on ${model}`);
+          }
           break;
         }
 
@@ -509,6 +523,12 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
 
         // 2. Non-retryable on this model (429 rate limit or 404 not found): skip to next candidate model
         if (!classified.shouldRetry && classified.shouldTryNextModel) {
+          if (hasBackupProvider) {
+            console.log(
+              `[TeacherCheck Diagnostics] Fast-failing Gemini to backup provider on ${classified.category} | Model: ${model} | Total Duration: ${Date.now() - startTime}ms`
+            );
+            throw err;
+          }
           break;
         }
 
@@ -552,6 +572,13 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
       return normalizeCorrectionResponse(text, parsed);
     }
 
+    if (hasBackupProvider) {
+      console.log(
+        `[TeacherCheck Diagnostics] Fast-failing Gemini to backup provider after active model attempt | Model: ${model} | Total Duration: ${Date.now() - startTime}ms`
+      );
+      throw lastError || new Error(`Gemini active model ${model} failed`);
+    }
+
     if (modelIndex < candidateModels.length - 1) {
       console.log(
         `[TeacherCheck Diagnostics] Moving to next model candidate | Previous: ${model} | Next: ${candidateModels[modelIndex + 1]} | Total Duration: ${Date.now() - startTime}ms`
@@ -560,6 +587,107 @@ export async function callGeminiAPI(text, apiKey, options = {}) {
   }
 
   throw lastError || new Error("Failed to connect to Gemini API models");
+}
+
+/**
+ * Non-invasive diagnostic health check for Gemini API.
+ * Never exposes secrets, authorization headers, or user sentences.
+ * Used for verification, diagnostics, and testing.
+ */
+export async function checkGeminiHealth(options = {}) {
+  const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
+  const model = options.model || process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+  const fetchFn = options.fetch || fetch;
+  const timeoutMs = options.timeoutMs || 6000;
+
+  const isConfigured = Boolean(apiKey);
+  if (!isConfigured) {
+    return {
+      configured: false,
+      model,
+      success: false,
+      httpStatus: null,
+      category: 'NOT_CONFIGURED',
+      durationMs: 0
+    };
+  }
+
+  const startTime = Date.now();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const payload = {
+    contents: [
+      {
+        parts: [{ text: "ping" }]
+      }
+    ]
+  };
+
+  try {
+    const signal = AbortSignal.timeout(timeoutMs);
+    const response = await fetchFn(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
+      body: JSON.stringify(payload),
+      signal
+    });
+
+    const durationMs = Date.now() - startTime;
+    if (response.ok) {
+      return {
+        configured: true,
+        model,
+        success: true,
+        httpStatus: response.status,
+        category: 'OK',
+        durationMs
+      };
+    }
+
+    let providerStatus = null;
+    let sanitizedErrorMessage = 'Unknown error';
+    try {
+      const errData = await response.json();
+      if (errData?.error) {
+        providerStatus = errData.error.status || null;
+        if (typeof errData.error.message === 'string') {
+          sanitizedErrorMessage = errData.error.message
+            .split('\n')[0]
+            .substring(0, 200)
+            .replace(/key=[^&\s]+/gi, 'key=[REDACTED]');
+        }
+      }
+    } catch {}
+
+    const classified = classifyGeminiError({
+      status: response.status,
+      providerStatus,
+      message: sanitizedErrorMessage
+    });
+
+    return {
+      configured: true,
+      model,
+      success: false,
+      httpStatus: response.status,
+      providerStatus,
+      category: classified.category,
+      durationMs
+    };
+  } catch (err) {
+    const durationMs = Date.now() - startTime;
+    const classified = classifyGeminiError({ err });
+    return {
+      configured: true,
+      model,
+      success: false,
+      httpStatus: null,
+      category: classified.category,
+      durationMs
+    };
+  }
 }
 
 /**
