@@ -408,6 +408,17 @@ function updatePageMeta(pageKey) {
   setAttr('meta[name="twitter:title"]', 'content', meta.title);
   setAttr('meta[name="twitter:description"]', 'content', meta.description);
   setAttr('meta[name="twitter:url"]', 'content', meta.url);
+
+  // Notify Google Analytics of SPA route changes (zero text payload)
+  if (typeof window.gtag === 'function') {
+    try {
+      window.gtag('event', 'page_view', {
+        page_title: meta.title,
+        page_location: window.location.href,
+        page_path: window.location.pathname
+      });
+    } catch {}
+  }
 }
 
 /**
