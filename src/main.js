@@ -364,33 +364,50 @@ function attachEventListeners() {
 /**
  * Page Metadata Management
  */
+const BASE_CANONICAL_URL = 'https://teachercheckai.com';
+
 const PAGE_META = {
   landing: {
     title: "TeacherCheck — Fix Your English, Keep Your Voice",
-    description: "Check your English without rewriting your personality. TeacherCheck corrects genuine mistakes and keeps your words yours."
+    description: "Check your English without rewriting your personality. TeacherCheck corrects genuine mistakes and keeps your words yours.",
+    url: `${BASE_CANONICAL_URL}/`
   },
   app: {
     title: "TeacherCheck — Red Pen Grammar Correction",
-    description: "Submit English sentences for instant, teacher-style red-pen grammar feedback while keeping your authentic tone."
+    description: "Submit English sentences for instant, teacher-style red-pen grammar feedback while keeping your authentic tone.",
+    url: `${BASE_CANONICAL_URL}/app`
   },
   privacy: {
     title: "Privacy Policy — TeacherCheck",
-    description: "Read the TeacherCheck Privacy Policy. Learn how your English text is processed for grammar checking and how your privacy is protected."
+    description: "Read the TeacherCheck Privacy Policy. Learn how your English text is processed for grammar checking and how your privacy is protected.",
+    url: `${BASE_CANONICAL_URL}/privacy`
   },
   terms: {
     title: "Terms of Service — TeacherCheck",
-    description: "Read the TeacherCheck Terms of Service. Understand terms of use, educational guidance disclaimers, and service conditions."
+    description: "Read the TeacherCheck Terms of Service. Understand terms of use, educational guidance disclaimers, and service conditions.",
+    url: `${BASE_CANONICAL_URL}/terms`
   }
 };
 
 function updatePageMeta(pageKey) {
   const meta = PAGE_META[pageKey];
   if (!meta) return;
+
   document.title = meta.title;
-  const metaDesc = document.querySelector('meta[name="description"]');
-  if (metaDesc) {
-    metaDesc.setAttribute('content', meta.description);
-  }
+
+  const setAttr = (selector, attr, val) => {
+    const el = document.querySelector(selector);
+    if (el && val) el.setAttribute(attr, val);
+  };
+
+  setAttr('meta[name="description"]', 'content', meta.description);
+  setAttr('link[rel="canonical"]', 'href', meta.url);
+  setAttr('meta[property="og:title"]', 'content', meta.title);
+  setAttr('meta[property="og:description"]', 'content', meta.description);
+  setAttr('meta[property="og:url"]', 'content', meta.url);
+  setAttr('meta[name="twitter:title"]', 'content', meta.title);
+  setAttr('meta[name="twitter:description"]', 'content', meta.description);
+  setAttr('meta[name="twitter:url"]', 'content', meta.url);
 }
 
 /**
