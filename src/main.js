@@ -627,6 +627,16 @@ async function handleCheck() {
     const result = await response.json();
     lastAnalysisResult = result;
 
+    // Send minimal, privacy-safe analytics event (zero user writing transmitted)
+    if (typeof window.gtag === 'function') {
+      try {
+        window.gtag('event', 'grammar_check_completed', {
+          has_corrections: Boolean(result.hasCorrections),
+          correction_count: Array.isArray(result.corrections) ? result.corrections.length : 0
+        });
+      } catch {}
+    }
+
     // Synthesize realistic subtle pen scribble sound
     playSoftPenSound();
 
