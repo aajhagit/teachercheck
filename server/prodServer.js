@@ -3,7 +3,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleApiCheck } from './apiHandler.js';
+import { handleApiCheck, handleApiQuota } from './apiHandler.js';
 import { applySecurityHeaders } from './securityHeaders.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,12 +35,17 @@ const server = http.createServer((req, res) => {
   // Always apply security headers to every response
   applySecurityHeaders(res);
 
-  // 1. API Route: /api/check
+  // 1. API Routes: /api/check and /api/quota
   const urlObj = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = urlObj.pathname;
 
   if (pathname === '/api/check') {
     handleApiCheck(req, res);
+    return;
+  }
+
+  if (pathname === '/api/quota') {
+    handleApiQuota(req, res);
     return;
   }
 

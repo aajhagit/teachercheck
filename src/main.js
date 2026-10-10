@@ -60,6 +60,18 @@ const linkPrivacy = document.getElementById('linkPrivacy');
 const linkTerms = document.getElementById('linkTerms');
 const linkContact = document.getElementById('linkContact');
 
+// Daily Quota Elements & State
+const quotaRemainingNum = document.getElementById('quotaRemainingNum');
+const quotaHeaderItem = document.getElementById('quotaHeaderItem');
+const quotaExceededBanner = document.getElementById('quotaExceededBanner');
+const quotaResetTime = document.getElementById('quotaResetTime');
+
+let currentQuota = {
+  limit: 5,
+  remaining: 5,
+  resetAt: null
+};
+
 const MAX_CHARS = 500;
 const DRAFT_KEY = 'teachercheck_user_draft';
 
@@ -77,6 +89,63 @@ function init() {
   renderPresets();
   attachEventListeners();
   handleRoute();
+  fetchQuotaStatus();
+}
+
+function updateQuotaUI(quota) {
+  if (!quota) return;
+  currentQuota = {
+    limit: typeof quota.limit === 'number' ? quota.limit : 5,
+    remaining: typeof quota.remaining === 'number' ? quota.remaining : 5,
+    resetAt: quota.resetAt || null
+  };
+
+  if (quotaRemainingNum) {
+    quotaRemainingNum.textContent = currentQuota.remaining;
+  }
+
+  if (quotaHeaderItem) {
+    if (currentQuota.remaining <= 0) {
+      quotaHeaderItem.classList.add('depleted');
+      quotaHeaderItem.title = "Daily free limit reached (0/5 left today). Resets at midnight UTC.";
+    } else {
+      quotaHeaderItem.classList.remove('depleted');
+      quotaHeaderItem.title = `Free daily grammar checks (${currentQuota.remaining}/5 left today). Resets at midnight UTC.`;
+    }
+  }
+
+  if (quotaResetTime && currentQuota.resetAt) {
+    const d = new Date(currentQuota.resetAt);
+    quotaResetTime.textContent = isNaN(d.getTime()) ? '00:00 UTC' : d.toUTCString();
+  }
+
+  if (quotaExceededBanner) {
+    if (currentQuota.remaining <= 0) {
+      quotaExceededBanner.classList.remove('hidden');
+      if (checkBtn) {
+        checkBtn.disabled = true;
+        checkBtn.title = "Daily free limit reached (5/5 checks used today)";
+      }
+    } else {
+      quotaExceededBanner.classList.add('hidden');
+      if (checkBtn && !isChecking) {
+        checkBtn.disabled = false;
+        checkBtn.title = "";
+      }
+    }
+  }
+}
+
+async function fetchQuotaStatus() {
+  try {
+    const res = await fetch('/api/quota');
+    if (res.ok) {
+      const data = await res.json();
+      updateQuotaUI(data);
+    }
+  } catch (err) {
+    console.warn('[TeacherCheck] Could not fetch initial quota:', err);
+  }
 }
 
 function loadSavedDraft() {
@@ -587,6 +656,14 @@ function getCaretOffsetFromClick(container, event, fullText) {
 async function handleCheck() {
   if (isChecking) return;
 
+  if (currentQuota.remaining <= 0) {
+    if (quotaExceededBanner) {
+      quotaExceededBanner.classList.remove('hidden');
+    }
+    showError("Daily free limit reached (5/5 checks used today). Your free checks reset at midnight UTC.");
+    return;
+  }
+
   const text = sentenceInput.value.trim();
   if (!text) {
     showError("Please write something in the notebook before checking.");
@@ -616,6 +693,9 @@ async function handleCheck() {
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       if (response.status === 429) {
+        if (errData.code === 'DAILY_QUOTA_EXCEEDED') {
+          updateQuotaUI(errData.quota || { limit: 5, remaining: 0, resetAt: null });
+        }
         throw new Error(errData.error || "Too many check requests. Please wait a moment before trying again.");
       }
       if (response.status === 413) {
@@ -626,6 +706,10 @@ async function handleCheck() {
 
     const result = await response.json();
     lastAnalysisResult = result;
+
+    if (result.quota) {
+      updateQuotaUI(result.quota);
+    }
 
     // Send minimal, privacy-safe analytics event (zero user writing transmitted)
     if (typeof window.gtag === 'function') {
@@ -669,7 +753,6 @@ function setLoadingState(isLoading) {
     `;
     sentenceInput.disabled = true;
   } else {
-    checkBtn.disabled = false;
     checkBtn.classList.remove('is-loading');
     checkBtn.innerHTML = `
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -678,6 +761,13 @@ function setLoadingState(isLoading) {
       Check My English
     `;
     sentenceInput.disabled = false;
+    if (currentQuota.remaining <= 0) {
+      checkBtn.disabled = true;
+      checkBtn.title = "Daily free limit reached (5/5 checks used today)";
+    } else {
+      checkBtn.disabled = false;
+      checkBtn.title = "";
+    }
   }
 }
 
@@ -922,6 +1012,16 @@ function switchToEditor() {
   inputActions.classList.remove('hidden');
 
   autoResizeTextarea();
+
+  if (currentQuota.remaining <= 0) {
+    if (quotaExceededBanner) {
+      quotaExceededBanner.classList.remove('hidden');
+    }
+    if (checkBtn) {
+      checkBtn.disabled = true;
+      checkBtn.title = "Daily free limit reached (5/5 checks used today)";
+    }
+  }
 }
 
 /**

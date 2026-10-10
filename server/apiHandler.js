@@ -1,11 +1,72 @@
 import { checkEnglishWithAI } from './aiService.js';
 import { rateLimiter } from './rateLimiter.js';
+import { dailyQuotaManager, getUtcMidnightReset } from './dailyQuota.js';
+import { getOrCreateAnonymousId, getPrivacySaltedIpHash } from './cookieSession.js';
 import { 
   applySecurityHeaders, 
   checkCorsOrigin, 
   sanitizeCheckResponse, 
   logSafeEvent 
 } from './securityHeaders.js';
+
+/**
+ * Request Handler for GET /api/quota
+ * Informs the client of remaining free grammar checks for today.
+ */
+export async function handleApiQuota(req, res) {
+  applySecurityHeaders(res);
+
+  const cors = checkCorsOrigin(req);
+  if (!cors.allowed) {
+    res.statusCode = 403;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Origin not allowed' }));
+    return;
+  }
+
+  if (cors.origin) {
+    res.setHeader('Access-Control-Allow-Origin', cors.origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
+  if (req.method !== 'GET') {
+    res.statusCode = 405;
+    res.setHeader('Allow', 'GET, OPTIONS');
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  const { anonId, hasCookie } = getOrCreateAnonymousId(req, res);
+  const clientIp = rateLimiter.getClientIp(req);
+  const { dateKey } = getUtcMidnightReset();
+  const identifier = hasCookie ? `anon:${anonId}` : `ip:${getPrivacySaltedIpHash(clientIp, dateKey)}`;
+
+  const status = await dailyQuotaManager.getStatus(identifier);
+
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Daily-Limit', status.limit);
+  res.setHeader('X-Daily-Remaining', status.remaining);
+  res.setHeader('X-Daily-Reset', status.resetsAtEpoch);
+
+  res.end(JSON.stringify({
+    limit: status.limit,
+    remaining: status.remaining,
+    used: status.used,
+    resetAt: status.resetAt || status.resetsAt,
+    resetsAt: status.resetsAt
+  }));
+}
 
 /**
  * Shared Request Handler for POST /api/check
@@ -49,7 +110,7 @@ export async function handleApiCheck(req, res) {
     return;
   }
 
-  // 4. IP-Based Rate Limiting Check
+  // 4. IP-Based Short-Term Burst Rate Limiting Check (Anti-DDoS Shield)
   const rateResult = rateLimiter.check(req);
   res.setHeader('X-RateLimit-Limit', rateLimiter.max);
   res.setHeader('X-RateLimit-Remaining', rateResult.remaining);
@@ -133,7 +194,45 @@ export async function handleApiCheck(req, res) {
       return;
     }
 
-    // 7. Check with AI & Sanitize Response Output
+    // 7. Server-Side Daily Free Quota Reservation (Atomic & Concurrency-Safe)
+    const { anonId, hasCookie } = getOrCreateAnonymousId(req, res);
+    const clientIp = rateLimiter.getClientIp(req);
+    const { dateKey } = getUtcMidnightReset();
+    const identifier = hasCookie ? `anon:${anonId}` : `ip:${getPrivacySaltedIpHash(clientIp, dateKey)}`;
+
+    const reservation = await dailyQuotaManager.reserveCheck(identifier);
+
+    if (reservation.unconfigured) {
+      logSafeEvent('QUOTA_UNCONFIGURED', { ip: getPrivacySaltedIpHash(clientIp, dateKey) });
+      res.statusCode = 503;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ 
+        error: 'Daily free quota service is temporarily unavailable. Storage configuration required.' 
+      }));
+      return;
+    }
+
+    if (!reservation.allowed) {
+      logSafeEvent('DAILY_QUOTA_EXCEEDED', { remaining: 0 });
+      res.statusCode = 429;
+      res.setHeader('X-Daily-Limit', reservation.limit);
+      res.setHeader('X-Daily-Remaining', 0);
+      res.setHeader('X-Daily-Reset', reservation.resetsAtEpoch);
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ 
+        code: 'DAILY_QUOTA_EXCEEDED',
+        error: reservation.error,
+        quota: {
+          limit: reservation.limit,
+          remaining: 0,
+          resetAt: reservation.resetAt || reservation.resetsAt,
+          resetsAt: reservation.resetsAt
+        }
+      }));
+      return;
+    }
+
+    // 8. Check with AI & Sanitize Response Output
     try {
       const rawResult = await checkEnglishWithAI(text);
       const sanitized = sanitizeCheckResponse(rawResult);
@@ -143,13 +242,28 @@ export async function handleApiCheck(req, res) {
         status: sanitized.status,
         textLength: text.length,
         correctionsCount: sanitized.corrections.length,
-        durationMs
+        durationMs,
+        quotaRemaining: reservation.remaining
       });
 
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
+      res.setHeader('X-Daily-Limit', reservation.limit);
+      res.setHeader('X-Daily-Remaining', reservation.remaining);
+      res.setHeader('X-Daily-Reset', reservation.resetsAtEpoch);
+
+      sanitized.quota = {
+        limit: reservation.limit,
+        remaining: reservation.remaining,
+        resetAt: reservation.resetAt || reservation.resetsAt,
+        resetsAt: reservation.resetsAt
+      };
+
       res.end(JSON.stringify(sanitized));
     } catch (err) {
+      // Compensating Transaction: Roll back reservation so failed checks DO NOT consume user quota
+      await dailyQuotaManager.rollbackReservation(identifier);
+
       const durationMs = Date.now() - startTime;
       logSafeEvent('CHECK_ERROR', {
         errorType: err.name || 'UnknownError',

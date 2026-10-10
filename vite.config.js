@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { handleApiCheck } from './server/apiHandler.js';
+import { handleApiCheck, handleApiQuota } from './server/apiHandler.js';
 import { applySecurityHeaders } from './server/securityHeaders.js';
 
 export default defineConfig({
@@ -18,7 +18,8 @@ export default defineConfig({
           next();
         });
 
-        // Protected API route: POST /api/check
+        // Protected API routes
+        server.middlewares.use('/api/quota', handleApiQuota);
         server.middlewares.use('/api/check', handleApiCheck);
       }
     }

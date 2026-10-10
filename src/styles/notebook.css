@@ -528,3 +528,70 @@
   line-height: 1.5;
   color: #4B5563;
 }
+
+/* Notebook Quota Header Badge */
+.notebook-quota-item {
+  color: var(--color-ink-subtle);
+  background-color: rgba(0, 0, 0, 0.03);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+}
+
+.notebook-quota-item strong {
+  color: var(--color-ink-teacher);
+  font-weight: 700;
+}
+
+.notebook-quota-item.depleted {
+  background-color: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.notebook-quota-item.depleted strong {
+  color: #DC2626;
+}
+
+/* Daily Quota Exceeded Banner (Notebook aesthetic) */
+.notebook-quota-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background-color: #FEF3C7;
+  border-left: 4px solid #D97706;
+  border-radius: 0 6px 6px 0;
+  padding: 14px 16px;
+  margin-top: 14px;
+  color: #92400E;
+  font-family: var(--font-ui);
+  line-height: 1.45;
+  animation: noteFadeUp 0.3s ease-out;
+}
+
+.quota-banner-icon {
+  flex-shrink: 0;
+  color: #D97706;
+  margin-top: 2px;
+}
+
+.quota-banner-body {
+  flex: 1;
+}
+
+.quota-banner-title {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #78350F;
+  margin-bottom: 4px;
+}
+
+.quota-banner-text {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: #92400E;
+  margin: 0;
+  line-height: 1.4;
+}
+
