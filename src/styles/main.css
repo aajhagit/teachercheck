@@ -369,22 +369,32 @@ body {
 .landing-nav-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .landing-nav-actions {
+    gap: 12px;
+  }
 }
 
 .landing-nav-auth-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #4B5563;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 999px;
-  padding: 6px 14px;
+  padding: 5px 10px;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .landing-nav-auth-btn:hover {
@@ -393,40 +403,77 @@ body {
   border-color: #D1D5DB;
 }
 
+@media (min-width: 640px) {
+  .landing-nav-auth-btn {
+    font-size: 14px;
+    padding: 6px 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .landing-nav-actions {
+    gap: 4px;
+  }
+  .landing-nav-auth-btn {
+    font-size: 12.5px;
+    padding: 4px 6px;
+  }
+}
+
 .landing-user-menu {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .landing-user-menu {
+    gap: 8px;
+  }
 }
 
 .landing-user-email {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: #374151;
   background: rgba(0, 0, 0, 0.05);
-  padding: 5px 12px;
+  padding: 4px 8px;
   border-radius: 999px;
-  max-width: 170px;
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+@media (min-width: 640px) {
+  .landing-user-email {
+    font-size: 13px;
+    padding: 5px 12px;
+    max-width: 170px;
+  }
+}
+
 .landing-nav-logout-btn {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 12px;
   color: #6B7280;
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 4px;
   transition: color 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.landing-nav-logout-btn:hover {
-  color: var(--color-ink-teacher);
+@media (min-width: 640px) {
+  .landing-nav-logout-btn {
+    font-size: 13px;
+    padding: 4px 8px;
+  }
 }
 
 /* App Header Bar (App View) */

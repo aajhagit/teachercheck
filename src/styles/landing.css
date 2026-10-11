@@ -24,32 +24,66 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0;
+  padding: 12px 0;
+  gap: 8px;
+  width: 100%;
   border-bottom: 1px solid rgba(70, 115, 175, 0.16);
+}
+
+@media (min-width: 640px) {
+  .landing-nav {
+    padding: 16px 0;
+    gap: 16px;
+  }
 }
 
 .landing-brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   text-decoration: none;
   color: var(--color-ink-student);
+  flex-shrink: 0;
+}
+
+.landing-brand .logo-pen-icon {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .landing-brand {
+    gap: 10px;
+  }
+  .landing-brand .logo-pen-icon {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 .landing-brand-title {
   font-family: var(--font-student);
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .landing-brand-title {
+    font-size: 22px;
+  }
 }
 
 .landing-nav-cta {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 12px;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-ink-teacher);
   background: #FFF;
@@ -58,12 +92,44 @@
   text-decoration: none;
   transition: all 0.15s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .landing-nav-cta:hover {
   background: var(--color-ink-teacher-bg);
   border-color: var(--color-ink-teacher);
   transform: translateY(-1px);
+}
+
+@media (min-width: 640px) {
+  .landing-nav-cta {
+    gap: 6px;
+    padding: 8px 18px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .landing-container {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .landing-brand {
+    gap: 5px;
+  }
+  .landing-brand .logo-pen-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .landing-brand-title {
+    font-size: 17px;
+  }
+  .landing-nav-cta {
+    padding: 4px 8px;
+    font-size: 12px;
+    gap: 3px;
+  }
 }
 
 /* HERO SECTION */
