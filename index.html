@@ -912,7 +912,7 @@
 
       <!-- Auth Form -->
       <form id="authForm" class="auth-form" novalidate>
-        <div class="auth-form-group">
+        <div class="auth-form-group" id="authEmailGroup">
           <label for="authEmail" class="auth-label">Email address</label>
           <input 
             type="email" 
@@ -927,7 +927,7 @@
 
         <div class="auth-form-group" id="authPasswordGroup">
           <div class="auth-label-row">
-            <label for="authPassword" class="auth-label">Password</label>
+            <label for="authPassword" class="auth-label" id="authPasswordLabel">Password</label>
             <button type="button" class="auth-forgot-link" id="authForgotBtn">Forgot password?</button>
           </div>
           <input 
@@ -941,6 +941,20 @@
             required
           />
           <span class="auth-helper-text hidden" id="authPasswordHelper">Must be at least 6 characters.</span>
+        </div>
+
+        <div class="auth-form-group hidden" id="authConfirmPasswordGroup">
+          <label for="authConfirmPassword" class="auth-label" id="authConfirmPasswordLabel">Confirm New Password</label>
+          <input
+            type="password"
+            id="authConfirmPassword"
+            name="confirmPassword"
+            class="auth-input"
+            placeholder="••••••••"
+            autocomplete="new-password"
+            minlength="6"
+          />
+          <span class="auth-helper-text hidden" id="authConfirmPasswordHelper">Re-enter your new password to confirm.</span>
         </div>
 
         <button type="submit" class="auth-submit-btn" id="authSubmitBtn">

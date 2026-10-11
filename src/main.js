@@ -4,6 +4,7 @@ import {
   signUp, 
   signOut, 
   resetPasswordForEmail, 
+  updateUserPassword,
   getSession, 
   getAccessToken,
   formatAuthError,
@@ -91,6 +92,7 @@ const notebookAccountStatus = document.getElementById('notebookAccountStatus');
 
 // Auth Modal Elements
 const authModal = document.getElementById('authModal');
+const authTabs = document.getElementById('authTabs');
 const authModalCloseBtn = document.getElementById('authModalCloseBtn');
 const authModalTitle = document.getElementById('authModalTitle');
 const authModalSubtitle = document.getElementById('authModalSubtitle');
@@ -101,16 +103,21 @@ const authNoticeIcon = document.getElementById('authNoticeIcon');
 const authNoticeText = document.getElementById('authNoticeText');
 const authForm = document.getElementById('authForm');
 const authEmail = document.getElementById('authEmail');
+const authEmailGroup = document.getElementById('authEmailGroup');
 const authPassword = document.getElementById('authPassword');
 const authPasswordGroup = document.getElementById('authPasswordGroup');
+const authPasswordLabel = document.getElementById('authPasswordLabel');
 const authPasswordHelper = document.getElementById('authPasswordHelper');
+const authConfirmPasswordGroup = document.getElementById('authConfirmPasswordGroup');
+const authConfirmPassword = document.getElementById('authConfirmPassword');
+const authConfirmPasswordHelper = document.getElementById('authConfirmPasswordHelper');
 const authForgotBtn = document.getElementById('authForgotBtn');
 const authSubmitBtn = document.getElementById('authSubmitBtn');
 const authSubmitText = document.getElementById('authSubmitText');
 const authSwitchPrompt = document.getElementById('authSwitchPrompt');
 const authSwitchBtn = document.getElementById('authSwitchBtn');
 
-let currentAuthMode = 'signin'; // 'signin' | 'signup' | 'forgot'
+let currentAuthMode = 'signin'; // 'signin' | 'signup' | 'forgot' | 'recovery'
 let currentUser = null;
 
 let currentQuota = {
@@ -525,6 +532,13 @@ function attachEventListeners() {
   if (authForm) {
     authForm.addEventListener('submit', handleAuthSubmit);
   }
+
+  // Keyboard accessibility: Escape key closes auth modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && authModal && !authModal.classList.contains('hidden')) {
+      closeAuthModal();
+    }
+  });
 }
 
 /**
@@ -611,13 +625,29 @@ function switchAuthMode(mode) {
   currentAuthMode = mode;
   clearAuthNotice();
 
+  // Reset standard layout toggles
+  if (authTabs) authTabs.classList.remove('hidden');
+  if (authEmailGroup) authEmailGroup.classList.remove('hidden');
+  if (authEmail) authEmail.required = true;
+  if (authPasswordLabel) authPasswordLabel.textContent = 'Password';
+  if (authForgotBtn) authForgotBtn.classList.remove('hidden');
+  if (authConfirmPasswordGroup) authConfirmPasswordGroup.classList.add('hidden');
+  if (authConfirmPassword) {
+    authConfirmPassword.required = false;
+    authConfirmPassword.value = '';
+  }
+
   if (mode === 'signin') {
     if (authModalTitle) authModalTitle.textContent = 'Classroom Sign In';
     if (authModalSubtitle) authModalSubtitle.textContent = 'Sign in to save your exercises and keep practicing.';
     if (tabSignIn) tabSignIn.classList.add('is-active');
     if (tabSignUp) tabSignUp.classList.remove('is-active');
     if (authPasswordGroup) authPasswordGroup.classList.remove('hidden');
-    if (authPassword) authPassword.required = true;
+    if (authPassword) {
+      authPassword.required = true;
+      authPassword.autocomplete = 'current-password';
+      authPassword.placeholder = '••••••••';
+    }
     if (authPasswordHelper) authPasswordHelper.classList.add('hidden');
     if (authSubmitText) authSubmitText.textContent = 'Sign In';
     if (authSwitchPrompt) authSwitchPrompt.textContent = "Don't have an account?";
@@ -627,9 +657,17 @@ function switchAuthMode(mode) {
     if (authModalSubtitle) authModalSubtitle.textContent = 'Create your account to start checking English.';
     if (tabSignIn) tabSignIn.classList.remove('is-active');
     if (tabSignUp) tabSignUp.classList.add('is-active');
+    if (authForgotBtn) authForgotBtn.classList.add('hidden');
     if (authPasswordGroup) authPasswordGroup.classList.remove('hidden');
-    if (authPassword) authPassword.required = true;
-    if (authPasswordHelper) authPasswordHelper.classList.remove('hidden');
+    if (authPassword) {
+      authPassword.required = true;
+      authPassword.autocomplete = 'new-password';
+      authPassword.placeholder = '••••••••';
+    }
+    if (authPasswordHelper) {
+      authPasswordHelper.textContent = 'Must be at least 6 characters.';
+      authPasswordHelper.classList.remove('hidden');
+    }
     if (authSubmitText) authSubmitText.textContent = 'Create Account';
     if (authSwitchPrompt) authSwitchPrompt.textContent = 'Already have an account?';
     if (authSwitchBtn) authSwitchBtn.textContent = 'Sign in';
@@ -644,6 +682,33 @@ function switchAuthMode(mode) {
     if (authSubmitText) authSubmitText.textContent = 'Send Reset Link';
     if (authSwitchPrompt) authSwitchPrompt.textContent = 'Remembered your password?';
     if (authSwitchBtn) authSwitchBtn.textContent = 'Back to sign in';
+  } else if (mode === 'recovery') {
+    if (authModalTitle) authModalTitle.textContent = 'Set New Password';
+    if (authModalSubtitle) authModalSubtitle.textContent = 'Enter and confirm your new password to update your account.';
+    if (authTabs) authTabs.classList.add('hidden');
+    if (authEmailGroup) authEmailGroup.classList.add('hidden');
+    if (authEmail) authEmail.required = false;
+    if (authForgotBtn) authForgotBtn.classList.add('hidden');
+    if (authPasswordGroup) authPasswordGroup.classList.remove('hidden');
+    if (authPasswordLabel) authPasswordLabel.textContent = 'New Password';
+    if (authPassword) {
+      authPassword.required = true;
+      authPassword.autocomplete = 'new-password';
+      authPassword.placeholder = '••••••••';
+      authPassword.value = '';
+    }
+    if (authPasswordHelper) {
+      authPasswordHelper.textContent = 'Must be at least 6 characters.';
+      authPasswordHelper.classList.remove('hidden');
+    }
+    if (authConfirmPasswordGroup) authConfirmPasswordGroup.classList.remove('hidden');
+    if (authConfirmPassword) {
+      authConfirmPassword.required = true;
+      authConfirmPassword.value = '';
+    }
+    if (authSubmitText) authSubmitText.textContent = 'Update Password';
+    if (authSwitchPrompt) authSwitchPrompt.textContent = 'Need to sign in instead?';
+    if (authSwitchBtn) authSwitchBtn.textContent = 'Back to sign in';
   }
 }
 
@@ -651,7 +716,9 @@ function openAuthModal(initialMode = 'signin') {
   if (!authModal) return;
   switchAuthMode(initialMode);
   authModal.classList.remove('hidden');
-  if (authEmail) {
+  if (initialMode === 'recovery') {
+    if (authPassword) authPassword.focus();
+  } else if (authEmail) {
     authEmail.focus();
   }
 }
@@ -663,11 +730,77 @@ function closeAuthModal() {
   if (authForm) {
     authForm.reset();
   }
+  if (authPassword) authPassword.value = '';
+  if (authConfirmPassword) authConfirmPassword.value = '';
 }
 
 async function handleAuthSubmit(e) {
   e.preventDefault();
   clearAuthNotice();
+
+  if (currentAuthMode === 'recovery') {
+    const newPassword = authPassword?.value || '';
+    const confirmPassword = authConfirmPassword?.value || '';
+
+    if (!newPassword) {
+      showAuthNotice('error', 'Please enter your new password.');
+      authPassword?.focus();
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      showAuthNotice('error', 'Password must be at least 6 characters long.');
+      authPassword?.focus();
+      return;
+    }
+
+    if (!confirmPassword) {
+      showAuthNotice('error', 'Please confirm your new password.');
+      authConfirmPassword?.focus();
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showAuthNotice('error', 'Passwords do not match. Please ensure both fields are identical.');
+      authConfirmPassword?.focus();
+      return;
+    }
+
+    // Confirm active Supabase recovery session exists before attempting password update
+    const currentSession = await getSession();
+    if (!currentSession?.user) {
+      showAuthNotice('error', 'Your password reset link is invalid or has expired. Please request a new reset link.');
+      return;
+    }
+
+    if (authSubmitBtn) authSubmitBtn.disabled = true;
+    if (authSubmitText) authSubmitText.textContent = 'Updating password...';
+
+    try {
+      const { data, error } = await updateUserPassword(newPassword);
+      if (error) {
+        showAuthNotice('error', formatAuthError(error, 'Unable to update password. Please request a new reset link.'));
+        return;
+      }
+
+      if (authPassword) authPassword.value = '';
+      if (authConfirmPassword) authConfirmPassword.value = '';
+
+      cleanAuthHash();
+      await signOut();
+
+      switchAuthMode('signin');
+      showAuthNotice('success', 'Password updated successfully! You can now sign in with your new password.');
+    } catch (err) {
+      showAuthNotice('error', formatAuthError(err, 'An unexpected error occurred while updating your password.'));
+    } finally {
+      if (authSubmitBtn) authSubmitBtn.disabled = false;
+      if (authSubmitText && currentAuthMode === 'recovery') {
+        authSubmitText.textContent = 'Update Password';
+      }
+    }
+    return;
+  }
 
   const email = authEmail?.value ? authEmail.value.trim() : '';
   const password = authPassword?.value || '';
@@ -736,6 +869,7 @@ async function handleAuthSubmit(e) {
       if (currentAuthMode === 'signin') authSubmitText.textContent = 'Sign In';
       else if (currentAuthMode === 'signup') authSubmitText.textContent = 'Create Account';
       else if (currentAuthMode === 'forgot') authSubmitText.textContent = 'Send Reset Link';
+      else if (currentAuthMode === 'recovery') authSubmitText.textContent = 'Update Password';
     }
   }
 }
@@ -750,21 +884,65 @@ async function handleSignOut() {
   }
 }
 
-async function initAuth() {
+function getAuthHashParams() {
+  if (typeof window === 'undefined' || !window.location?.hash) return {};
   try {
-    const session = await getSession();
-    if (session?.user) {
-      updateAuthUI(session.user);
-    } else {
-      updateAuthUI(null);
+    const hash = window.location.hash.replace(/^#/, '');
+    const params = new URLSearchParams(hash);
+    return {
+      type: params.get('type'),
+      accessToken: params.get('access_token'),
+      error: params.get('error'),
+      errorCode: params.get('error_code'),
+      errorDescription: params.get('error_description')
+    };
+  } catch {
+    return {};
+  }
+}
+
+function cleanAuthHash() {
+  try {
+    if (typeof window !== 'undefined' && window.location?.hash) {
+      const cleanUrl = window.location.pathname + window.location.search;
+      window.history.replaceState(null, '', cleanUrl);
     }
-    await fetchQuotaStatus();
-  } catch (err) {
-    console.warn('[TeacherCheck Auth] Error retrieving initial session:', err);
-    updateAuthUI(null);
+  } catch {}
+}
+
+async function initAuth() {
+  // Check for error parameters in the URL hash (e.g. expired or invalid recovery link)
+  const hashParams = getAuthHashParams();
+  if (hashParams.error || hashParams.errorCode) {
+    cleanAuthHash();
+    openAuthModal('forgot');
+    showAuthNotice('error', 'Your password reset link is invalid or has expired. Please request a new reset link.');
+    getSession().then((session) => updateAuthUI(session?.user || null)).catch(() => updateAuthUI(null));
+    return;
   }
 
+  let recoveryModalOpened = false;
+
+  // Register auth state listener early so no events are dropped
   onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      if (recoveryModalOpened) {
+        cleanAuthHash();
+        return;
+      }
+      if (session?.user) {
+        recoveryModalOpened = true;
+        openAuthModal('recovery');
+        showAuthNotice('info', 'Please enter and confirm your new password below.');
+        cleanAuthHash();
+      } else {
+        cleanAuthHash();
+        openAuthModal('forgot');
+        showAuthNotice('error', 'Your password reset link is invalid or has expired. Please request a new reset link.');
+      }
+      return;
+    }
+
     if (session?.user) {
       updateAuthUI(session.user);
     } else {
@@ -772,6 +950,37 @@ async function initAuth() {
     }
     fetchQuotaStatus();
   });
+
+  try {
+    const session = await getSession();
+    // A recovery URL must contain both type=recovery AND access_token, AND establish a valid user session
+    const isRecoveryUrl = hashParams.type === 'recovery' && Boolean(hashParams.accessToken);
+
+    if (isRecoveryUrl && !recoveryModalOpened) {
+      if (session?.user) {
+        recoveryModalOpened = true;
+        openAuthModal('recovery');
+        showAuthNotice('info', 'Please enter and confirm your new password below.');
+        cleanAuthHash();
+      } else {
+        cleanAuthHash();
+        openAuthModal('forgot');
+        showAuthNotice('error', 'Your password reset link is invalid or has expired. Please request a new reset link.');
+      }
+    } else if (session?.user) {
+      updateAuthUI(session.user);
+    } else {
+      updateAuthUI(null);
+      // Clean up bare or orphan #type=recovery hash without tokens
+      if (hashParams.type === 'recovery') {
+        cleanAuthHash();
+      }
+    }
+    await fetchQuotaStatus();
+  } catch (err) {
+    console.warn('[TeacherCheck Auth] Error retrieving initial session:', err);
+    updateAuthUI(null);
+  }
 }
 
 /**
@@ -822,12 +1031,13 @@ function updatePageMeta(pageKey) {
   setAttr('meta[name="twitter:description"]', 'content', meta.description);
   setAttr('meta[name="twitter:url"]', 'content', meta.url);
 
-  // Notify Google Analytics of SPA route changes (zero text payload)
+  // Notify Google Analytics of SPA route changes (zero text payload, sanitized location without token hashes)
   if (typeof window.gtag === 'function') {
     try {
+      const safeLocation = window.location.origin + window.location.pathname + window.location.search;
       window.gtag('event', 'page_view', {
         page_title: meta.title,
-        page_location: window.location.href,
+        page_location: safeLocation,
         page_path: window.location.pathname
       });
     } catch {}

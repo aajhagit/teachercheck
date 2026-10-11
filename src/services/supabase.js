@@ -131,7 +131,9 @@ export async function signUp(email, password) {
   }
 
   try {
-    const redirectUrl = `${window.location.origin}/app`;
+    const redirectUrl = (typeof window !== 'undefined' && window.location?.origin)
+      ? `${window.location.origin}/app`
+      : 'https://teachercheckai.com/app';
     const { data, error } = await client.auth.signUp({
       email: email.trim(),
       password,
@@ -188,7 +190,9 @@ export async function resetPasswordForEmail(email) {
   }
 
   try {
-    const redirectUrl = `${window.location.origin}/app`;
+    const redirectUrl = (typeof window !== 'undefined' && window.location?.origin)
+      ? `${window.location.origin}/app`
+      : 'https://teachercheckai.com/app';
     const { data, error } = await client.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: redirectUrl
     });
@@ -204,6 +208,51 @@ export async function resetPasswordForEmail(email) {
   } catch (err) {
     console.warn('[TeacherCheck Auth] Password reset network exception:', {
       action: 'resetPasswordForEmail',
+      name: err.name,
+      message: err.message
+    });
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Update current user's password (used for password recovery flow).
+ * Requires an active, authenticated recovery session.
+ * Never logs or exposes password values.
+ */
+export async function updateUserPassword(newPassword) {
+  const client = getSupabase();
+  if (!client) {
+    return {
+      data: null,
+      error: new Error('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.')
+    };
+  }
+
+  try {
+    const { data: sessionData, error: sessionErr } = await client.auth.getSession();
+    if (sessionErr || !sessionData?.session?.user) {
+      return {
+        data: null,
+        error: new Error('No active recovery session found. Your password reset link may have expired or already been used. Please request a new reset link.')
+      };
+    }
+
+    const { data, error } = await client.auth.updateUser({
+      password: newPassword
+    });
+    if (error) {
+      console.warn('[TeacherCheck Auth] Password update failed:', {
+        action: 'updateUserPassword',
+        status: error.status,
+        name: error.name,
+        message: error.message
+      });
+    }
+    return { data, error };
+  } catch (err) {
+    console.warn('[TeacherCheck Auth] Password update network exception:', {
+      action: 'updateUserPassword',
       name: err.name,
       message: err.message
     });
