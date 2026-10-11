@@ -1,8 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Retrieve Vite environment variables for Supabase
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+/**
+ * Normalizes the Supabase URL to ensure it points to the project origin
+ * (e.g. strips accidental trailing slashes, /rest/v1, or /auth/v1 paths).
+ */
+export function normalizeSupabaseUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.origin;
+  } catch {
+    return trimmed.replace(/\/+$/, '').replace(/\/rest\/v1\/?$/, '').replace(/\/auth\/v1\/?$/, '');
+  }
+}
+
+// Retrieve environment variables for Supabase (compatible with both Vite and Node test environments)
+const env = (typeof import.meta !== 'undefined' && import.meta.env) 
+  ? import.meta.env 
+  : (typeof process !== 'undefined' && process.env ? process.env : {});
+
+const rawSupabaseUrl = env.VITE_SUPABASE_URL || '';
+const supabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl);
+const supabaseAnonKey = (env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 let supabaseInstance = null;
 
