@@ -24,6 +24,7 @@ export class UpstashRedisStorage {
     }
     this.url = (options.url || process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');
     this.token = options.token || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+    this.timeoutMs = options.timeoutMs || 5000;
   }
 
   isConfigured() {
@@ -32,6 +33,10 @@ export class UpstashRedisStorage {
 
   getType() {
     return 'upstash-redis';
+  }
+
+  getSignal() {
+    return typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(this.timeoutMs) : undefined;
   }
 
   async incrWithTtl(key, ttlSeconds) {
@@ -49,7 +54,8 @@ export class UpstashRedisStorage {
       body: JSON.stringify([
         ['INCR', key],
         ['EXPIRE', key, ttlSeconds]
-      ])
+      ]),
+      signal: this.getSignal()
     });
 
     if (!res.ok) {
@@ -73,7 +79,8 @@ export class UpstashRedisStorage {
         Authorization: `Bearer ${this.token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(['DECR', key])
+      body: JSON.stringify(['DECR', key]),
+      signal: this.getSignal()
     });
 
     if (!res.ok) {
@@ -96,7 +103,8 @@ export class UpstashRedisStorage {
         Authorization: `Bearer ${this.token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(['GET', key])
+      body: JSON.stringify(['GET', key]),
+      signal: this.getSignal()
     });
 
     if (!res.ok) {
@@ -120,7 +128,8 @@ export class UpstashRedisStorage {
         Authorization: `Bearer ${this.token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(['SET', key, value, 'EX', ttlSeconds])
+      body: JSON.stringify(['SET', key, value, 'EX', ttlSeconds]),
+      signal: this.getSignal()
     });
 
     if (!res.ok) {

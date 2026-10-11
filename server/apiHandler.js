@@ -15,76 +15,107 @@ import {
  * Informs the client of remaining free grammar checks for today.
  */
 export async function handleApiQuota(req, res) {
-  applySecurityHeaders(res);
+  try {
+    applySecurityHeaders(res);
 
-  const cors = checkCorsOrigin(req);
-  if (!cors.allowed) {
-    res.statusCode = 403;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Origin not allowed' }));
-    return;
-  }
-
-  if (cors.origin) {
-    res.setHeader('Access-Control-Allow-Origin', cors.origin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 204;
-    res.end();
-    return;
-  }
-
-  if (req.method !== 'GET') {
-    res.statusCode = 405;
-    res.setHeader('Allow', 'GET, OPTIONS');
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  // Token Verification
-  const authResult = await authService.verifyUserToken(req.headers['authorization']);
-  if (authResult.error) {
-    if (authResult.error === 'AUTH_TIMEOUT' || authResult.error === 'AUTH_UNCONFIGURED' || authResult.error === 'AUTH_ERROR') {
-      res.statusCode = 503;
+    const cors = checkCorsOrigin(req);
+    if (!cors.allowed) {
+      res.statusCode = 403;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ error: authResult.message || 'Authentication service is temporarily unavailable.' }));
+      res.end(JSON.stringify({ error: 'Origin not allowed' }));
       return;
     }
-    res.statusCode = 401;
+
+    if (cors.origin) {
+      res.setHeader('Access-Control-Allow-Origin', cors.origin);
+      res.setHeader('Vary', 'Origin');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.setHeader('Allow', 'GET, OPTIONS');
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+
+    // Token Verification
+    const authResult = await authService.verifyUserToken(req.headers['authorization']);
+    if (authResult.error) {
+      if (authResult.error === 'AUTH_TIMEOUT' || authResult.error === 'AUTH_UNCONFIGURED' || authResult.error === 'AUTH_ERROR') {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: authResult.message || 'Authentication service is temporarily unavailable.' }));
+        return;
+      }
+      res.statusCode = 401;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: authResult.message || 'Invalid or expired session. Please sign in again.' }));
+      return;
+    }
+
+    const { anonId, hasCookie } = getOrCreateAnonymousId(req, res);
+    const clientIp = rateLimiter.getClientIp(req);
+    const { dateKey } = getUtcMidnightReset();
+    const anonIdentifier = hasCookie ? `anon:${anonId}` : `ip:${getPrivacySaltedIpHash(clientIp, dateKey)}`;
+
+    const identifier = authResult.authenticated ? `user:${authResult.user.id}` : anonIdentifier;
+    
+    let status;
+    try {
+      status = await dailyQuotaManager.getStatus(identifier, {
+        linkedIdentifier: authResult.authenticated ? anonIdentifier : null
+      });
+    } catch (err) {
+      logSafeEvent('QUOTA_STORAGE_ERROR', { errorType: err?.name || 'StorageError' });
+      res.statusCode = 503;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ 
+        error: 'Daily quota service is temporarily unavailable. Please try again shortly.' 
+      }));
+      return;
+    }
+
+    if (!status.configured && (process.env.NODE_ENV === 'production' || dailyQuotaManager.getStorageType() === 'unconfigured')) {
+      logSafeEvent('QUOTA_UNCONFIGURED', { ip: getPrivacySaltedIpHash(clientIp, dateKey) });
+      res.statusCode = 503;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ 
+        error: 'Daily quota service is temporarily unavailable. Storage configuration required.' 
+      }));
+      return;
+    }
+
+    res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: authResult.message || 'Invalid or expired session. Please sign in again.' }));
-    return;
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Daily-Limit', status.limit);
+    res.setHeader('X-Daily-Remaining', status.remaining);
+    res.setHeader('X-Daily-Reset', status.resetsAtEpoch);
+
+    res.end(JSON.stringify({
+      limit: status.limit,
+      remaining: status.remaining,
+      used: status.used,
+      resetAt: status.resetAt || status.resetsAt,
+      resetsAt: status.resetsAt
+    }));
+  } catch (err) {
+    logSafeEvent('QUOTA_HANDLER_ERROR', { errorType: err?.name || 'Error' });
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'An unexpected server error occurred.' }));
+    }
   }
-
-  const { anonId, hasCookie } = getOrCreateAnonymousId(req, res);
-  const clientIp = rateLimiter.getClientIp(req);
-  const { dateKey } = getUtcMidnightReset();
-  const anonIdentifier = hasCookie ? `anon:${anonId}` : `ip:${getPrivacySaltedIpHash(clientIp, dateKey)}`;
-
-  const identifier = authResult.authenticated ? `user:${authResult.user.id}` : anonIdentifier;
-  const status = await dailyQuotaManager.getStatus(identifier, {
-    linkedIdentifier: authResult.authenticated ? anonIdentifier : null
-  });
-
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('X-Daily-Limit', status.limit);
-  res.setHeader('X-Daily-Remaining', status.remaining);
-  res.setHeader('X-Daily-Reset', status.resetsAtEpoch);
-
-  res.end(JSON.stringify({
-    limit: status.limit,
-    remaining: status.remaining,
-    used: status.used,
-    resetAt: status.resetAt || status.resetsAt,
-    resetsAt: status.resetsAt
-  }));
 }
 
 /**
@@ -165,12 +196,13 @@ export async function handleApiCheck(req, res) {
   });
 
   req.on('end', async () => {
-    if (isTooLarge) {
-      res.statusCode = 413;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ error: 'Payload too large. Please keep your sentence under 600 characters.' }));
-      return;
-    }
+    try {
+      if (isTooLarge) {
+        res.statusCode = 413;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'Payload too large. Please keep your sentence under 600 characters.' }));
+        return;
+      }
 
     // 6. JSON Structure & Type Validation
     let parsed;
@@ -235,9 +267,20 @@ export async function handleApiCheck(req, res) {
     const anonIdentifier = hasCookie ? `anon:${anonId}` : `ip:${getPrivacySaltedIpHash(clientIp, dateKey)}`;
 
     const identifier = authResult.authenticated ? `user:${authResult.user.id}` : anonIdentifier;
-    const reservation = await dailyQuotaManager.reserveCheck(identifier, {
-      linkedIdentifier: authResult.authenticated ? anonIdentifier : null
-    });
+    let reservation;
+    try {
+      reservation = await dailyQuotaManager.reserveCheck(identifier, {
+        linkedIdentifier: authResult.authenticated ? anonIdentifier : null
+      });
+    } catch (err) {
+      logSafeEvent('QUOTA_STORAGE_ERROR', { errorType: err?.name || 'StorageError' });
+      res.statusCode = 503;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ 
+        error: 'Daily free quota service is temporarily unavailable. Please try again shortly.' 
+      }));
+      return;
+    }
 
     if (reservation.unconfigured) {
       logSafeEvent('QUOTA_UNCONFIGURED', { ip: getPrivacySaltedIpHash(clientIp, dateKey) });
@@ -299,9 +342,13 @@ export async function handleApiCheck(req, res) {
       res.end(JSON.stringify(sanitized));
     } catch (err) {
       // Compensating Transaction: Roll back reservation so failed checks DO NOT consume user quota
-      await dailyQuotaManager.rollbackReservation(identifier, {
-        linkedIdentifier: authResult.authenticated ? anonIdentifier : null
-      });
+      try {
+        await dailyQuotaManager.rollbackReservation(identifier, {
+          linkedIdentifier: authResult.authenticated ? anonIdentifier : null
+        });
+      } catch (rollbackErr) {
+        logSafeEvent('QUOTA_ROLLBACK_ERROR', { errorType: rollbackErr?.name || 'StorageError' });
+      }
 
       const durationMs = Date.now() - startTime;
       logSafeEvent('CHECK_ERROR', {
@@ -316,5 +363,22 @@ export async function handleApiCheck(req, res) {
         error: 'The teacher is temporarily unavailable. Please try again shortly.' 
       }));
     }
-  });
+  } catch (unhandledErr) {
+    logSafeEvent('CHECK_UNHANDLED_ERROR', { errorType: unhandledErr?.name || 'Error' });
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'An unexpected server error occurred.' }));
+    }
+  }
+});
+
+req.on('error', (err) => {
+  logSafeEvent('REQUEST_STREAM_ERROR', { errorType: err?.name || 'StreamError' });
+  if (!res.headersSent) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Request connection error.' }));
+  }
+});
 }

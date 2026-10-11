@@ -1,13 +1,38 @@
 import crypto from 'crypto';
 
 export const COOKIE_NAME = 'tc_anon_id';
-const DEFAULT_DEV_SECRET = 'teachercheck-dev-quota-secret-2026';
+export const DEFAULT_DEV_SECRET = 'teachercheck-dev-quota-secret-2026';
 
 /**
  * Returns the secret key used for signing anonymous session cookies.
+ * In production (NODE_ENV === 'production'), strictly requires SESSION_SECRET or COOKIE_SECRET.
+ * In development and test environments, falls back to DEFAULT_DEV_SECRET.
+ * Never prints secret values.
  */
-export function getSessionSecret() {
-  return process.env.SESSION_SECRET || process.env.COOKIE_SECRET || DEFAULT_DEV_SECRET;
+export function getSessionSecret(env = process.env) {
+  const secret = (env.SESSION_SECRET || env.COOKIE_SECRET || '').trim();
+  if (secret) {
+    return secret;
+  }
+
+  const isProd = (env.NODE_ENV === 'production');
+  if (isProd) {
+    throw new Error(
+      'SESSION_SECRET or COOKIE_SECRET environment variable is required in production. ' +
+      'Set SESSION_SECRET in Render environment variables to securely sign anonymous quota cookies.'
+    );
+  }
+
+  return DEFAULT_DEV_SECRET;
+}
+
+/**
+ * Validates that the session secret is properly configured for the current environment.
+ * Throws in production if missing; returns true when valid.
+ */
+export function validateSessionSecret(env = process.env) {
+  getSessionSecret(env);
+  return true;
 }
 
 /**
@@ -140,9 +165,10 @@ export const resolveSession = getOrCreateAnonymousId;
  * Generates a privacy-safe, salted, daily-rotating hash for client IP when cookies are not provided.
  * Raw IP is never stored. The hash rotates every midnight UTC.
  */
-export function getPrivacySaltedIpHash(clientIp, dateKey, secret = getSessionSecret()) {
+export function getPrivacySaltedIpHash(clientIp, dateKey, secret) {
+  const effectiveSecret = secret || getSessionSecret();
   const safeIp = clientIp || '127.0.0.1';
-  return crypto.createHmac('sha256', secret)
+  return crypto.createHmac('sha256', effectiveSecret)
     .update(`tc-ip-v1:${safeIp}:${dateKey}`)
     .digest('hex')
     .substring(0, 32);

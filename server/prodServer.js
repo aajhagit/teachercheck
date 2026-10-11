@@ -5,6 +5,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleApiCheck, handleApiQuota } from './apiHandler.js';
 import { applySecurityHeaders } from './securityHeaders.js';
+import { validateSessionSecret } from './cookieSession.js';
+
+// SEC-01: In production, fail safely on startup if cookie signing secret is missing
+if (process.env.NODE_ENV === 'production') {
+  validateSessionSecret(process.env);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,17 +41,31 @@ const server = http.createServer((req, res) => {
   // Always apply security headers to every response
   applySecurityHeaders(res);
 
-  // 1. API Routes: /api/check and /api/quota
+  // 1. API Routes: /api/check and /api/quota (SEC-02: prevent unhandled promise rejections)
   const urlObj = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = urlObj.pathname;
 
   if (pathname === '/api/check') {
-    handleApiCheck(req, res);
+    Promise.resolve(handleApiCheck(req, res)).catch(err => {
+      console.error('[TeacherCheck Server] Unhandled error in /api/check:', err?.name || 'Error');
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'An unexpected server error occurred.' }));
+      }
+    });
     return;
   }
 
   if (pathname === '/api/quota') {
-    handleApiQuota(req, res);
+    Promise.resolve(handleApiQuota(req, res)).catch(err => {
+      console.error('[TeacherCheck Server] Unhandled error in /api/quota:', err?.name || 'Error');
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'An unexpected server error occurred.' }));
+      }
+    });
     return;
   }
 
