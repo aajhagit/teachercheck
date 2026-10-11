@@ -168,6 +168,14 @@ export async function getSession() {
 }
 
 /**
+ * Returns current user's access token (JWT) if authenticated, or null
+ */
+export async function getAccessToken() {
+  const session = await getSession();
+  return session?.access_token || null;
+}
+
+/**
  * Subscribe to auth state changes (login, logout, token refresh)
  */
 export function onAuthStateChange(callback) {

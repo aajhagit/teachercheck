@@ -70,9 +70,11 @@ export class DailyQuotaManager {
 
   /**
    * Reads current quota status without modifying counters.
+   * If options.linkedIdentifier is supplied, synchronizes quota usage bidirectionally
+   * so anonymous usage carries over into authenticated accounts without giving extra checks.
    */
-  async getStatus(identifier) {
-    const { dateKey, nextResetIso, nextResetEpoch } = getUtcMidnightReset();
+  async getStatus(identifier, options = {}) {
+    const { dateKey, nextResetIso, nextResetEpoch, ttlSeconds } = getUtcMidnightReset();
 
     if (!this.storage.isConfigured()) {
       return {
@@ -86,6 +88,38 @@ export class DailyQuotaManager {
     }
 
     const key = this.buildKey(identifier, dateKey);
+    const storageTtl = ttlSeconds + 3600;
+
+    // Anonymous-to-Authenticated Quota Continuity Policy:
+    // Sync usage between account and session identifiers
+    if (options.linkedIdentifier && options.linkedIdentifier !== identifier) {
+      const linkedKey = this.buildKey(options.linkedIdentifier, dateKey);
+      const [mainCount, linkedCount] = await Promise.all([
+        this.storage.get(key),
+        this.storage.get(linkedKey)
+      ]);
+
+      const effectiveCount = Math.max(mainCount, linkedCount);
+      if (effectiveCount > mainCount && typeof this.storage.setWithTtl === 'function') {
+        await this.storage.setWithTtl(key, effectiveCount, storageTtl).catch(() => {});
+      }
+      if (effectiveCount > linkedCount && typeof this.storage.setWithTtl === 'function') {
+        await this.storage.setWithTtl(linkedKey, effectiveCount, storageTtl).catch(() => {});
+      }
+
+      const remaining = Math.max(0, this.limit - effectiveCount);
+      return {
+        configured: true,
+        limit: this.limit,
+        remaining,
+        used: Math.min(this.limit, effectiveCount),
+        count: effectiveCount,
+        resetAt: nextResetIso,
+        resetsAt: nextResetIso,
+        resetsAtEpoch: nextResetEpoch
+      };
+    }
+
     const count = await this.storage.get(key);
     const remaining = Math.max(0, this.limit - count);
 
@@ -105,8 +139,9 @@ export class DailyQuotaManager {
    * Atomically reserves a check quota slot BEFORE calling the AI service.
    * Handles concurrent bursts safely: simultaneous requests increment atomically,
    * and any request that pushes the count beyond the limit is immediately rejected and rolled back.
+   * If options.linkedIdentifier is supplied, ensures anonymous checks already used cannot be reset by signing in.
    */
-  async reserveCheck(identifier) {
+  async reserveCheck(identifier, options = {}) {
     const { dateKey, nextResetIso, nextResetEpoch, ttlSeconds } = getUtcMidnightReset();
 
     if (!this.storage.isConfigured()) {
@@ -126,6 +161,34 @@ export class DailyQuotaManager {
     const key = this.buildKey(identifier, dateKey);
     // Add 1 hour grace period to key TTL to handle clock skew across machines
     const storageTtl = ttlSeconds + 3600;
+
+    // Quota continuity guard: prevent gaining a fresh allowance by signing in
+    if (options.linkedIdentifier && options.linkedIdentifier !== identifier) {
+      const linkedKey = this.buildKey(options.linkedIdentifier, dateKey);
+      const [mainCount, linkedCount] = await Promise.all([
+        this.storage.get(key),
+        this.storage.get(linkedKey)
+      ]);
+
+      const effectiveCount = Math.max(mainCount, linkedCount);
+      if (effectiveCount >= this.limit) {
+        return {
+          allowed: false,
+          limit: this.limit,
+          remaining: 0,
+          used: this.limit,
+          count: this.limit,
+          resetAt: nextResetIso,
+          resetsAt: nextResetIso,
+          resetsAtEpoch: nextResetEpoch,
+          error: `Daily free limit reached (${this.limit}/${this.limit} checks used today). Your allowance resets at midnight UTC.`
+        };
+      }
+
+      if (effectiveCount > mainCount && typeof this.storage.setWithTtl === 'function') {
+        await this.storage.setWithTtl(key, effectiveCount, storageTtl).catch(() => {});
+      }
+    }
     
     // Atomic increment in persistent storage
     const newCount = await this.storage.incrWithTtl(key, storageTtl);
@@ -146,6 +209,12 @@ export class DailyQuotaManager {
       };
     }
 
+    // Mirror updated count to linked anonymous session so logging out cannot yield extra checks
+    if (options.linkedIdentifier && options.linkedIdentifier !== identifier && typeof this.storage.setWithTtl === 'function') {
+      const linkedKey = this.buildKey(options.linkedIdentifier, dateKey);
+      await this.storage.setWithTtl(linkedKey, newCount, storageTtl).catch(() => {});
+    }
+
     return {
       allowed: true,
       limit: this.limit,
@@ -162,11 +231,16 @@ export class DailyQuotaManager {
   /**
    * Compensating transaction: rolls back the reservation if upstream AI check fails.
    */
-  async rollbackReservation(identifier) {
+  async rollbackReservation(identifier, options = {}) {
     const { dateKey } = getUtcMidnightReset();
     if (!this.storage.isConfigured()) return 0;
     const key = this.buildKey(identifier, dateKey);
-    return await this.storage.decr(key);
+    const result = await this.storage.decr(key);
+    if (options.linkedIdentifier && options.linkedIdentifier !== identifier) {
+      const linkedKey = this.buildKey(options.linkedIdentifier, dateKey);
+      await this.storage.decr(linkedKey).catch(() => {});
+    }
+    return result;
   }
 }
 

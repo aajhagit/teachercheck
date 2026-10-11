@@ -5,6 +5,7 @@ import {
   signOut, 
   resetPasswordForEmail, 
   getSession, 
+  getAccessToken,
   onAuthStateChange 
 } from './services/supabase.js';
 
@@ -184,7 +185,12 @@ function updateQuotaUI(quota) {
 
 async function fetchQuotaStatus() {
   try {
-    const res = await fetch('/api/quota');
+    const headers = {};
+    const token = await getAccessToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const res = await fetch('/api/quota', { headers });
     if (res.ok) {
       const data = await res.json();
       updateQuotaUI(data);
@@ -751,6 +757,7 @@ async function initAuth() {
     } else {
       updateAuthUI(null);
     }
+    await fetchQuotaStatus();
   } catch (err) {
     console.warn('[TeacherCheck Auth] Error retrieving initial session:', err);
     updateAuthUI(null);
@@ -762,6 +769,7 @@ async function initAuth() {
     } else {
       updateAuthUI(null);
     }
+    fetchQuotaStatus();
   });
 }
 
@@ -1017,16 +1025,25 @@ async function handleCheck() {
   setLoadingState(true);
 
   try {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    const token = await getAccessToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch('/api/check', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({ text })
     });
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        throw new Error(errData.error || "Your session has expired. Please sign in again.");
+      }
       if (response.status === 429) {
         if (errData.code === 'DAILY_QUOTA_EXCEEDED') {
           updateQuotaUI(errData.quota || { limit: 5, remaining: 0, resetAt: null });

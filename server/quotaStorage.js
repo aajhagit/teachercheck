@@ -108,6 +108,28 @@ export class UpstashRedisStorage {
     if (data.result === null || data.result === undefined) return 0;
     return typeof data.result === 'number' ? data.result : parseInt(data.result, 10);
   }
+
+  async setWithTtl(key, value, ttlSeconds) {
+    if (!this.isConfigured()) {
+      throw new Error('UPSTASH_STORAGE_UNCONFIGURED');
+    }
+
+    const res = await fetch(`${this.url}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(['SET', key, value, 'EX', ttlSeconds])
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Upstash Redis error (${res.status}): ${errText}`);
+    }
+
+    return value;
+  }
 }
 
 export class InMemoryQuotaStorage {
@@ -149,6 +171,15 @@ export class InMemoryQuotaStorage {
     if (!entry) return 0;
     entry.count = Math.max(0, entry.count - 1);
     return entry.count;
+  }
+
+  async setWithTtl(key, value, ttlSeconds) {
+    const now = Date.now();
+    this.store.set(key, {
+      count: value,
+      expiresAt: now + (ttlSeconds * 1000)
+    });
+    return value;
   }
 
   async get(key) {
