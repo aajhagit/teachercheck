@@ -6,6 +6,7 @@ import {
   resetPasswordForEmail, 
   getSession, 
   getAccessToken,
+  formatAuthError,
   onAuthStateChange 
 } from './services/supabase.js';
 
@@ -696,7 +697,7 @@ async function handleAuthSubmit(e) {
       if (authSubmitText) authSubmitText.textContent = 'Signing in...';
       const { data, error } = await signIn(email, password);
       if (error) {
-        showAuthNotice('error', error.message || 'Unable to sign in. Please check your credentials.');
+        showAuthNotice('error', formatAuthError(error, 'Unable to sign in. Please check your credentials.'));
         return;
       }
       if (data?.user) {
@@ -707,7 +708,7 @@ async function handleAuthSubmit(e) {
       if (authSubmitText) authSubmitText.textContent = 'Creating account...';
       const { data, error } = await signUp(email, password);
       if (error) {
-        showAuthNotice('error', error.message || 'Unable to register account. Please try again.');
+        showAuthNotice('error', formatAuthError(error, 'Unable to register account. Please try again.'));
         return;
       }
       if (data?.session) {
@@ -722,13 +723,13 @@ async function handleAuthSubmit(e) {
       if (authSubmitText) authSubmitText.textContent = 'Sending reset link...';
       const { error } = await resetPasswordForEmail(email);
       if (error) {
-        showAuthNotice('error', error.message || 'Unable to send password reset email. Please try again.');
+        showAuthNotice('error', formatAuthError(error, 'Unable to send password reset email. Please try again.'));
         return;
       }
       showAuthNotice('success', 'Password reset instructions have been sent to your email.');
     }
   } catch (err) {
-    showAuthNotice('error', err.message || 'An unexpected error occurred. Please try again.');
+    showAuthNotice('error', formatAuthError(err, 'An unexpected error occurred. Please try again.'));
   } finally {
     if (authSubmitBtn) authSubmitBtn.disabled = false;
     if (authSubmitText) {

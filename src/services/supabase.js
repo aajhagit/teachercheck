@@ -61,6 +61,28 @@ export function getSupabase() {
 }
 
 /**
+ * Safely formats auth error messages for end-user display.
+ * Translates raw fetch/network exceptions into clear guidance without exposing internal details or credentials.
+ */
+export function formatAuthError(error, defaultMessage = 'An unexpected error occurred. Please try again.') {
+  if (!error) return defaultMessage;
+  const msg = typeof error === 'string' ? error : (error.message || '');
+  const name = error.name || '';
+
+  // Network, fetch, or CSP failure
+  if (
+    msg.includes('Failed to fetch') || 
+    msg.includes('NetworkError') || 
+    name === 'AuthRetryableFetchError' || 
+    name === 'TypeError'
+  ) {
+    return 'Unable to connect to the authentication service. Please check your internet connection or network security settings and try again.';
+  }
+
+  return msg || defaultMessage;
+}
+
+/**
  * Sign in existing user with email and password
  */
 export async function signIn(email, password) {
@@ -77,8 +99,21 @@ export async function signIn(email, password) {
       email: email.trim(),
       password
     });
+    if (error) {
+      console.warn('[TeacherCheck Auth] Sign in failed:', {
+        action: 'signIn',
+        status: error.status,
+        name: error.name,
+        message: error.message
+      });
+    }
     return { data, error };
   } catch (err) {
+    console.warn('[TeacherCheck Auth] Sign in network exception:', {
+      action: 'signIn',
+      name: err.name,
+      message: err.message
+    });
     return { data: null, error: err };
   }
 }
@@ -104,8 +139,21 @@ export async function signUp(email, password) {
         emailRedirectTo: redirectUrl
       }
     });
+    if (error) {
+      console.warn('[TeacherCheck Auth] Sign up failed:', {
+        action: 'signUp',
+        status: error.status,
+        name: error.name,
+        message: error.message
+      });
+    }
     return { data, error };
   } catch (err) {
+    console.warn('[TeacherCheck Auth] Sign up network exception:', {
+      action: 'signUp',
+      name: err.name,
+      message: err.message
+    });
     return { data: null, error: err };
   }
 }
@@ -144,8 +192,21 @@ export async function resetPasswordForEmail(email) {
     const { data, error } = await client.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: redirectUrl
     });
+    if (error) {
+      console.warn('[TeacherCheck Auth] Password reset failed:', {
+        action: 'resetPasswordForEmail',
+        status: error.status,
+        name: error.name,
+        message: error.message
+      });
+    }
     return { data, error };
   } catch (err) {
+    console.warn('[TeacherCheck Auth] Password reset network exception:', {
+      action: 'resetPasswordForEmail',
+      name: err.name,
+      message: err.message
+    });
     return { data: null, error: err };
   }
 }

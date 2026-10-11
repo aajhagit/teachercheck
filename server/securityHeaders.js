@@ -2,23 +2,47 @@
  * TeacherCheck Security Headers, CORS Policy & Response Sanitization
  */
 
-export const CSP_POLICY = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com",
-  "connect-src 'self' https://mxmzafzselbwjoqfheha.supabase.co https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.googletagmanager.com",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'"
-].join('; ');
+export const DEFAULT_SUPABASE_ORIGIN = 'https://mxmzafzselbwjogfheha.supabase.co';
+
+/**
+ * Builds the Content Security Policy dynamically, incorporating the configured Supabase origin.
+ */
+export function getCspPolicy() {
+  const envUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  let dynamicOrigin = '';
+  if (envUrl && typeof envUrl === 'string') {
+    try {
+      dynamicOrigin = new URL(envUrl.trim()).origin;
+    } catch {}
+  }
+
+  const supabaseOrigins = [
+    DEFAULT_SUPABASE_ORIGIN,
+    dynamicOrigin
+  ].filter(Boolean);
+
+  const uniqueSupabaseOrigins = [...new Set(supabaseOrigins)].join(' ');
+
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com",
+    `connect-src 'self' ${uniqueSupabaseOrigins} https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.googletagmanager.com`,
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'"
+  ].join('; ');
+}
+
+export const CSP_POLICY = getCspPolicy();
 
 /**
  * Applies HTTP security headers to any outgoing HTTP response
  */
 export function applySecurityHeaders(res) {
-  res.setHeader('Content-Security-Policy', CSP_POLICY);
+  res.setHeader('Content-Security-Policy', getCspPolicy());
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
