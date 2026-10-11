@@ -100,9 +100,16 @@
         </svg>
         <span class="landing-brand-title">TeacherCheck</span>
       </a>
-      <a href="/app" class="landing-nav-cta" id="navCtaBtn">
-        Open App &rarr;
-      </a>
+      <div class="landing-nav-actions" id="landingNavActions">
+        <button type="button" class="landing-nav-auth-btn" id="landingNavAuthBtn">Sign In</button>
+        <div class="landing-user-menu hidden" id="landingUserMenu">
+          <span class="landing-user-email" id="landingUserEmail"></span>
+          <button type="button" class="landing-nav-logout-btn" id="landingNavLogoutBtn">Log out</button>
+        </div>
+        <a href="/app" class="landing-nav-cta" id="navCtaBtn">
+          Open App &rarr;
+        </a>
+      </div>
     </header>
 
     <!-- 1. HERO SECTION -->
@@ -317,11 +324,23 @@
   <!-- 2. EXISTING NOTEBOOK APP VIEW (Active on /app or #app)       -->
   <!-- ============================================================ -->
   <div id="appView" class="app-container hidden">
-    <!-- Header with Back to Overview link -->
+    <!-- Header with Back to Overview link and Auth -->
     <header class="app-header">
-      <button type="button" class="back-to-landing-btn" id="backToLandingBtn" title="Back to landing page">
-        &larr; Back to Overview
-      </button>
+      <div class="app-header-bar">
+        <button type="button" class="back-to-landing-btn" id="backToLandingBtn" title="Back to landing page">
+          &larr; Back to Overview
+        </button>
+        <div class="app-header-auth" id="appHeaderAuth">
+          <button type="button" class="app-auth-btn" id="appAuthBtn">Sign In</button>
+          <div class="app-user-menu hidden" id="appUserMenu">
+            <span class="app-user-badge" id="appUserBadge" title="Signed in account">
+              <span class="user-status-dot"></span>
+              <span class="app-user-email-text" id="appUserEmail"></span>
+            </span>
+            <button type="button" class="app-logout-btn" id="appLogoutBtn" title="Log out of account">Log out</button>
+          </div>
+        </div>
+      </div>
       <div class="logo-badge" id="appBrand" style="cursor: pointer;" title="Back to overview">
         <svg class="logo-pen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 19l7-7 3 3-7 7-3-3z"/>
@@ -350,6 +369,10 @@
         <div class="notebook-header-item">
           <span class="notebook-header-label">Date:</span>
           <span class="notebook-header-value" id="currentDateValue">Today</span>
+        </div>
+        <div class="notebook-header-item notebook-account-item" id="notebookAccountItem">
+          <span class="notebook-header-label">Student:</span>
+          <span class="notebook-header-value" id="notebookAccountStatus">Guest (Free)</span>
         </div>
         <div class="notebook-header-item notebook-quota-item" id="quotaHeaderItem" title="Free daily grammar checks reset at midnight UTC">
           <span class="notebook-header-label">Daily Free Plan:</span>
@@ -850,6 +873,85 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn-secondary-paper" id="modalOkBtn" style="padding: 6px 16px;">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 4. SUPABASE AUTH MODAL (Sign In, Sign Up, Reset Password)    -->
+  <!-- ============================================================ -->
+  <div id="authModal" class="auth-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+    <div class="auth-modal-sheet">
+      <button type="button" class="modal-close-btn" id="authModalCloseBtn" aria-label="Close dialog">&times;</button>
+      
+      <!-- Notebook Header -->
+      <div class="auth-modal-header">
+        <div class="auth-modal-badge">
+          <svg class="logo-pen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18"/>
+            <path d="M2 2l7.586 7.586"/>
+            <circle cx="11" cy="11" r="2"/>
+          </svg>
+          <h3 class="auth-modal-title" id="authModalTitle">Classroom Sign In</h3>
+        </div>
+        <p class="auth-modal-subtitle" id="authModalSubtitle">Sign in to save your exercises and keep practicing.</p>
+      </div>
+
+      <!-- Mode Tabs (Sign In / Sign Up) -->
+      <div class="auth-tabs" id="authTabs">
+        <button type="button" class="auth-tab is-active" id="tabSignIn" data-mode="signin">Sign In</button>
+        <button type="button" class="auth-tab" id="tabSignUp" data-mode="signup">Create Account</button>
+      </div>
+
+      <!-- Notice / Alert Banner -->
+      <div class="auth-notice-banner hidden" id="authNoticeBanner" role="alert">
+        <span class="auth-notice-icon" id="authNoticeIcon"></span>
+        <span class="auth-notice-text" id="authNoticeText"></span>
+      </div>
+
+      <!-- Auth Form -->
+      <form id="authForm" class="auth-form" novalidate>
+        <div class="auth-form-group">
+          <label for="authEmail" class="auth-label">Email address</label>
+          <input 
+            type="email" 
+            id="authEmail" 
+            name="email" 
+            class="auth-input" 
+            placeholder="student@example.com" 
+            autocomplete="email" 
+            required
+          />
+        </div>
+
+        <div class="auth-form-group" id="authPasswordGroup">
+          <div class="auth-label-row">
+            <label for="authPassword" class="auth-label">Password</label>
+            <button type="button" class="auth-forgot-link" id="authForgotBtn">Forgot password?</button>
+          </div>
+          <input 
+            type="password" 
+            id="authPassword" 
+            name="password" 
+            class="auth-input" 
+            placeholder="••••••••" 
+            autocomplete="current-password"
+            minlength="6"
+            required
+          />
+          <span class="auth-helper-text hidden" id="authPasswordHelper">Must be at least 6 characters.</span>
+        </div>
+
+        <button type="submit" class="auth-submit-btn" id="authSubmitBtn">
+          <span id="authSubmitText">Sign In</span>
+        </button>
+      </form>
+
+      <!-- Switch Prompts -->
+      <div class="auth-switch-box" id="authSwitchBox">
+        <span id="authSwitchPrompt">Don't have an account?</span>
+        <button type="button" class="auth-switch-btn" id="authSwitchBtn">Create one now</button>
       </div>
     </div>
   </div>

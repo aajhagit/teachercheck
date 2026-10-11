@@ -360,3 +360,420 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* ============================================================ */
+/* AUTHENTICATION & USER PROFILE STYLES                         */
+/* ============================================================ */
+
+/* Top Navigation Auth (Landing Page) */
+.landing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.landing-nav-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  color: #4B5563;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.landing-nav-auth-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #111827;
+  border-color: #D1D5DB;
+}
+
+.landing-user-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.landing-user-email {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 5px 12px;
+  border-radius: 999px;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing-nav-logout-btn {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: #6B7280;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.landing-nav-logout-btn:hover {
+  color: var(--color-ink-teacher);
+}
+
+/* App Header Bar (App View) */
+.app-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.app-header-auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: #4B5563;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid #D1D5DB;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.app-auth-btn:hover {
+  background: #FFFFFF;
+  border-color: var(--color-ink-teacher);
+  color: var(--color-ink-teacher-dark);
+}
+
+.app-user-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: #374151;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #D1C7B5;
+  border-radius: 999px;
+  padding: 4px 10px;
+  max-width: 180px;
+}
+
+.user-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--color-stamp-green);
+  flex-shrink: 0;
+}
+
+.app-user-email-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-logout-btn {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: #6B7280;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.app-logout-btn:hover {
+  color: var(--color-ink-teacher);
+}
+
+/* Notebook Header Student Indicator */
+.notebook-account-item {
+  color: var(--color-ink-subtle);
+}
+
+.notebook-account-item .notebook-header-value {
+  color: #1F2937;
+  font-weight: 600;
+}
+
+/* Auth Modal Backdrop & Sheet */
+.auth-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.auth-modal-sheet {
+  background-color: var(--color-paper);
+  border: 1px solid var(--color-paper-edge);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+  padding: 26px 24px;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 16px 40px rgba(45, 35, 20, 0.16),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+}
+
+.auth-modal-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auth-modal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-modal-title {
+  font-family: var(--font-student);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #111827;
+}
+
+.auth-modal-subtitle {
+  font-family: var(--font-teacher);
+  font-size: 1.15rem;
+  color: var(--color-ink-teacher-dark);
+  line-height: 1.3;
+}
+
+/* Mode Tabs */
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--color-rule-line);
+  padding-bottom: 2px;
+}
+
+.auth-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -4px;
+  padding: 6px 14px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 4px 4px 0 0;
+}
+
+.auth-tab:hover {
+  color: #111827;
+}
+
+.auth-tab.is-active {
+  color: var(--color-ink-teacher);
+  font-weight: 600;
+  border-bottom-color: var(--color-ink-teacher);
+  background: var(--color-ink-teacher-bg);
+}
+
+/* Feedback Notice Banner */
+.auth-notice-banner {
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.auth-notice-banner.is-error {
+  background-color: #FEF2F2;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-left: 3px solid #DC2626;
+  color: #991B1B;
+}
+
+.auth-notice-banner.is-success {
+  background-color: #F0FDF4;
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  border-left: 3px solid #16A34A;
+  color: #166534;
+}
+
+.auth-notice-banner.is-info {
+  background-color: #EFF6FF;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-left: 3px solid #2563EB;
+  color: #1E40AF;
+}
+
+/* Auth Form Fields */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.auth-label {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.auth-forgot-link {
+  background: transparent;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--color-ink-teacher);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.auth-forgot-link:hover {
+  color: var(--color-ink-teacher-dark);
+}
+
+.auth-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #D5CEBE;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--color-ink-student);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: var(--color-ink-teacher);
+  box-shadow: 0 0 0 3px rgba(197, 34, 31, 0.12);
+}
+
+.auth-helper-text {
+  font-size: 12px;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+/* Submit Button */
+.auth-submit-btn {
+  background-color: var(--color-ink-teacher);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  padding: 11px 18px;
+  font-family: var(--font-ui);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  margin-top: 4px;
+  user-select: none;
+}
+
+.auth-submit-btn:hover {
+  background-color: var(--color-ink-teacher-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(197, 34, 31, 0.2);
+}
+
+.auth-submit-btn:active {
+  transform: translateY(1px);
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Bottom Switch Box */
+.auth-switch-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: #6B7280;
+  border-top: 1px dashed #E5E7EB;
+  padding-top: 12px;
+}
+
+.auth-switch-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-ink-teacher);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.auth-switch-btn:hover {
+  color: var(--color-ink-teacher-dark);
+}

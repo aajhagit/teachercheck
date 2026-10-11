@@ -1,4 +1,12 @@
 import { SAMPLE_PRESETS } from './data/grammarEngine.js';
+import { 
+  signIn, 
+  signUp, 
+  signOut, 
+  resetPasswordForEmail, 
+  getSession, 
+  onAuthStateChange 
+} from './services/supabase.js';
 
 // DOM Elements
 const sentenceInput = document.getElementById('sentenceInput');
@@ -66,6 +74,43 @@ const quotaHeaderItem = document.getElementById('quotaHeaderItem');
 const quotaExceededBanner = document.getElementById('quotaExceededBanner');
 const quotaResetTime = document.getElementById('quotaResetTime');
 
+// Auth Navigation & UI Elements
+const landingNavAuthBtn = document.getElementById('landingNavAuthBtn');
+const landingUserMenu = document.getElementById('landingUserMenu');
+const landingUserEmail = document.getElementById('landingUserEmail');
+const landingNavLogoutBtn = document.getElementById('landingNavLogoutBtn');
+
+const appAuthBtn = document.getElementById('appAuthBtn');
+const appUserMenu = document.getElementById('appUserMenu');
+const appUserEmail = document.getElementById('appUserEmail');
+const appLogoutBtn = document.getElementById('appLogoutBtn');
+
+const notebookAccountStatus = document.getElementById('notebookAccountStatus');
+
+// Auth Modal Elements
+const authModal = document.getElementById('authModal');
+const authModalCloseBtn = document.getElementById('authModalCloseBtn');
+const authModalTitle = document.getElementById('authModalTitle');
+const authModalSubtitle = document.getElementById('authModalSubtitle');
+const tabSignIn = document.getElementById('tabSignIn');
+const tabSignUp = document.getElementById('tabSignUp');
+const authNoticeBanner = document.getElementById('authNoticeBanner');
+const authNoticeIcon = document.getElementById('authNoticeIcon');
+const authNoticeText = document.getElementById('authNoticeText');
+const authForm = document.getElementById('authForm');
+const authEmail = document.getElementById('authEmail');
+const authPassword = document.getElementById('authPassword');
+const authPasswordGroup = document.getElementById('authPasswordGroup');
+const authPasswordHelper = document.getElementById('authPasswordHelper');
+const authForgotBtn = document.getElementById('authForgotBtn');
+const authSubmitBtn = document.getElementById('authSubmitBtn');
+const authSubmitText = document.getElementById('authSubmitText');
+const authSwitchPrompt = document.getElementById('authSwitchPrompt');
+const authSwitchBtn = document.getElementById('authSwitchBtn');
+
+let currentAuthMode = 'signin'; // 'signin' | 'signup' | 'forgot'
+let currentUser = null;
+
 let currentQuota = {
   limit: 5,
   remaining: 5,
@@ -90,6 +135,7 @@ function init() {
   attachEventListeners();
   handleRoute();
   fetchQuotaStatus();
+  initAuth();
 }
 
 function updateQuotaUI(quota) {
@@ -428,6 +474,295 @@ function attachEventListeners() {
       }
     });
   }
+
+  // Auth Triggers & Modal Listeners
+  if (landingNavAuthBtn) {
+    landingNavAuthBtn.addEventListener('click', () => openAuthModal('signin'));
+  }
+  if (landingNavLogoutBtn) {
+    landingNavLogoutBtn.addEventListener('click', handleSignOut);
+  }
+  if (appAuthBtn) {
+    appAuthBtn.addEventListener('click', () => openAuthModal('signin'));
+  }
+  if (appLogoutBtn) {
+    appLogoutBtn.addEventListener('click', handleSignOut);
+  }
+
+  if (tabSignIn) {
+    tabSignIn.addEventListener('click', () => switchAuthMode('signin'));
+  }
+  if (tabSignUp) {
+    tabSignUp.addEventListener('click', () => switchAuthMode('signup'));
+  }
+  if (authForgotBtn) {
+    authForgotBtn.addEventListener('click', () => switchAuthMode('forgot'));
+  }
+  if (authSwitchBtn) {
+    authSwitchBtn.addEventListener('click', () => {
+      if (currentAuthMode === 'signin') switchAuthMode('signup');
+      else switchAuthMode('signin');
+    });
+  }
+
+  if (authModalCloseBtn) {
+    authModalCloseBtn.addEventListener('click', closeAuthModal);
+  }
+  if (authModal) {
+    authModal.addEventListener('click', (e) => {
+      if (e.target === authModal) {
+        closeAuthModal();
+      }
+    });
+  }
+  if (authForm) {
+    authForm.addEventListener('submit', handleAuthSubmit);
+  }
+}
+
+/**
+ * Updates UI to reflect current authenticated user status
+ */
+function updateAuthUI(user) {
+  currentUser = user || null;
+  const isAuthed = Boolean(user && user.email);
+  const email = isAuthed ? user.email : '';
+
+  // Landing Navigation
+  if (landingNavAuthBtn) {
+    if (isAuthed) {
+      landingNavAuthBtn.classList.add('hidden');
+    } else {
+      landingNavAuthBtn.classList.remove('hidden');
+    }
+  }
+  if (landingUserMenu) {
+    if (isAuthed) {
+      landingUserMenu.classList.remove('hidden');
+      if (landingUserEmail) {
+        landingUserEmail.textContent = email;
+        landingUserEmail.title = email;
+      }
+    } else {
+      landingUserMenu.classList.add('hidden');
+      if (landingUserEmail) landingUserEmail.textContent = '';
+    }
+  }
+
+  // App Header Bar
+  if (appAuthBtn) {
+    if (isAuthed) {
+      appAuthBtn.classList.add('hidden');
+    } else {
+      appAuthBtn.classList.remove('hidden');
+    }
+  }
+  if (appUserMenu) {
+    if (isAuthed) {
+      appUserMenu.classList.remove('hidden');
+      if (appUserEmail) {
+        appUserEmail.textContent = email;
+        appUserEmail.title = email;
+      }
+    } else {
+      appUserMenu.classList.add('hidden');
+      if (appUserEmail) appUserEmail.textContent = '';
+    }
+  }
+
+  // Notebook Paper Header (Account status)
+  if (notebookAccountStatus) {
+    if (isAuthed) {
+      notebookAccountStatus.textContent = `${email} (Free)`;
+      notebookAccountStatus.title = `Signed in as ${email} (Free Plan)`;
+    } else {
+      notebookAccountStatus.textContent = 'Guest (Free)';
+      notebookAccountStatus.title = 'Guest user (Free Plan)';
+    }
+  }
+}
+
+function showAuthNotice(type, message) {
+  if (!authNoticeBanner || !authNoticeText) return;
+  authNoticeBanner.className = `auth-notice-banner is-${type}`;
+  if (authNoticeIcon) {
+    if (type === 'error') authNoticeIcon.textContent = '⚠️';
+    else if (type === 'success') authNoticeIcon.textContent = '✓';
+    else authNoticeIcon.textContent = 'ℹ️';
+  }
+  authNoticeText.textContent = message;
+  authNoticeBanner.classList.remove('hidden');
+}
+
+function clearAuthNotice() {
+  if (!authNoticeBanner) return;
+  authNoticeBanner.classList.add('hidden');
+  authNoticeBanner.className = 'auth-notice-banner hidden';
+}
+
+function switchAuthMode(mode) {
+  currentAuthMode = mode;
+  clearAuthNotice();
+
+  if (mode === 'signin') {
+    if (authModalTitle) authModalTitle.textContent = 'Classroom Sign In';
+    if (authModalSubtitle) authModalSubtitle.textContent = 'Sign in to save your exercises and keep practicing.';
+    if (tabSignIn) tabSignIn.classList.add('is-active');
+    if (tabSignUp) tabSignUp.classList.remove('is-active');
+    if (authPasswordGroup) authPasswordGroup.classList.remove('hidden');
+    if (authPassword) authPassword.required = true;
+    if (authPasswordHelper) authPasswordHelper.classList.add('hidden');
+    if (authSubmitText) authSubmitText.textContent = 'Sign In';
+    if (authSwitchPrompt) authSwitchPrompt.textContent = "Don't have an account?";
+    if (authSwitchBtn) authSwitchBtn.textContent = 'Create one now';
+  } else if (mode === 'signup') {
+    if (authModalTitle) authModalTitle.textContent = 'Student Registration';
+    if (authModalSubtitle) authModalSubtitle.textContent = 'Create your account to start checking English.';
+    if (tabSignIn) tabSignIn.classList.remove('is-active');
+    if (tabSignUp) tabSignUp.classList.add('is-active');
+    if (authPasswordGroup) authPasswordGroup.classList.remove('hidden');
+    if (authPassword) authPassword.required = true;
+    if (authPasswordHelper) authPasswordHelper.classList.remove('hidden');
+    if (authSubmitText) authSubmitText.textContent = 'Create Account';
+    if (authSwitchPrompt) authSwitchPrompt.textContent = 'Already have an account?';
+    if (authSwitchBtn) authSwitchBtn.textContent = 'Sign in';
+  } else if (mode === 'forgot') {
+    if (authModalTitle) authModalTitle.textContent = 'Reset Password';
+    if (authModalSubtitle) authModalSubtitle.textContent = 'Enter your email to receive a password reset link.';
+    if (tabSignIn) tabSignIn.classList.remove('is-active');
+    if (tabSignUp) tabSignUp.classList.remove('is-active');
+    if (authPasswordGroup) authPasswordGroup.classList.add('hidden');
+    if (authPassword) authPassword.required = false;
+    if (authPasswordHelper) authPasswordHelper.classList.add('hidden');
+    if (authSubmitText) authSubmitText.textContent = 'Send Reset Link';
+    if (authSwitchPrompt) authSwitchPrompt.textContent = 'Remembered your password?';
+    if (authSwitchBtn) authSwitchBtn.textContent = 'Back to sign in';
+  }
+}
+
+function openAuthModal(initialMode = 'signin') {
+  if (!authModal) return;
+  switchAuthMode(initialMode);
+  authModal.classList.remove('hidden');
+  if (authEmail) {
+    authEmail.focus();
+  }
+}
+
+function closeAuthModal() {
+  if (!authModal) return;
+  authModal.classList.add('hidden');
+  clearAuthNotice();
+  if (authForm) {
+    authForm.reset();
+  }
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  clearAuthNotice();
+
+  const email = authEmail?.value ? authEmail.value.trim() : '';
+  const password = authPassword?.value || '';
+
+  if (!email) {
+    showAuthNotice('error', 'Please enter your email address.');
+    authEmail?.focus();
+    return;
+  }
+
+  if (currentAuthMode !== 'forgot' && !password) {
+    showAuthNotice('error', 'Please enter your password.');
+    authPassword?.focus();
+    return;
+  }
+
+  if (currentAuthMode === 'signup' && password.length < 6) {
+    showAuthNotice('error', 'Password must be at least 6 characters long.');
+    authPassword?.focus();
+    return;
+  }
+
+  if (authSubmitBtn) authSubmitBtn.disabled = true;
+
+  try {
+    if (currentAuthMode === 'signin') {
+      if (authSubmitText) authSubmitText.textContent = 'Signing in...';
+      const { data, error } = await signIn(email, password);
+      if (error) {
+        showAuthNotice('error', error.message || 'Unable to sign in. Please check your credentials.');
+        return;
+      }
+      if (data?.user) {
+        updateAuthUI(data.user);
+        closeAuthModal();
+      }
+    } else if (currentAuthMode === 'signup') {
+      if (authSubmitText) authSubmitText.textContent = 'Creating account...';
+      const { data, error } = await signUp(email, password);
+      if (error) {
+        showAuthNotice('error', error.message || 'Unable to register account. Please try again.');
+        return;
+      }
+      if (data?.session) {
+        updateAuthUI(data.user);
+        closeAuthModal();
+      } else {
+        // Email confirmation is required
+        showAuthNotice('info', 'Confirmation email sent! Please check your inbox and verify your email to finish activating your account.');
+        if (authPassword) authPassword.value = '';
+      }
+    } else if (currentAuthMode === 'forgot') {
+      if (authSubmitText) authSubmitText.textContent = 'Sending reset link...';
+      const { error } = await resetPasswordForEmail(email);
+      if (error) {
+        showAuthNotice('error', error.message || 'Unable to send password reset email. Please try again.');
+        return;
+      }
+      showAuthNotice('success', 'Password reset instructions have been sent to your email.');
+    }
+  } catch (err) {
+    showAuthNotice('error', err.message || 'An unexpected error occurred. Please try again.');
+  } finally {
+    if (authSubmitBtn) authSubmitBtn.disabled = false;
+    if (authSubmitText) {
+      if (currentAuthMode === 'signin') authSubmitText.textContent = 'Sign In';
+      else if (currentAuthMode === 'signup') authSubmitText.textContent = 'Create Account';
+      else if (currentAuthMode === 'forgot') authSubmitText.textContent = 'Send Reset Link';
+    }
+  }
+}
+
+async function handleSignOut() {
+  try {
+    await signOut();
+  } catch (err) {
+    console.warn('[TeacherCheck Auth] Error signing out:', err);
+  } finally {
+    updateAuthUI(null);
+  }
+}
+
+async function initAuth() {
+  try {
+    const session = await getSession();
+    if (session?.user) {
+      updateAuthUI(session.user);
+    } else {
+      updateAuthUI(null);
+    }
+  } catch (err) {
+    console.warn('[TeacherCheck Auth] Error retrieving initial session:', err);
+    updateAuthUI(null);
+  }
+
+  onAuthStateChange((event, session) => {
+    if (session?.user) {
+      updateAuthUI(session.user);
+    } else {
+      updateAuthUI(null);
+    }
+  });
 }
 
 /**
