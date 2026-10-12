@@ -37,15 +37,156 @@ const MIME_TYPES = {
   '.xml': 'application/xml; charset=utf-8'
 };
 
-const server = http.createServer((req, res) => {
+const BASE_CANONICAL_URL = 'https://teachercheckai.com';
+
+export const ROUTE_METADATA = {
+  '/': {
+    title: 'TeacherCheck — Fix Your English, Keep Your Voice',
+    description: 'Check your English without rewriting your personality. TeacherCheck corrects genuine mistakes and keeps your words yours.',
+    canonical: `${BASE_CANONICAL_URL}/`,
+    robots: 'index, follow',
+    activeView: 'landingView'
+  },
+  '/privacy': {
+    title: 'Privacy Policy — TeacherCheck',
+    description: 'Read the TeacherCheck Privacy Policy. Learn how your English text is processed for grammar checking and how your privacy is protected.',
+    canonical: `${BASE_CANONICAL_URL}/privacy`,
+    robots: 'index, follow',
+    activeView: 'privacyView'
+  },
+  '/terms': {
+    title: 'Terms of Service — TeacherCheck',
+    description: 'Read the TeacherCheck Terms of Service. Understand terms of use, educational guidance disclaimers, and service conditions.',
+    canonical: `${BASE_CANONICAL_URL}/terms`,
+    robots: 'index, follow',
+    activeView: 'termsView'
+  },
+  '/app': {
+    title: 'TeacherCheck — Red Pen Grammar Correction',
+    description: 'Submit English sentences for instant, teacher-style red-pen grammar feedback while keeping your authentic tone.',
+    canonical: `${BASE_CANONICAL_URL}/app`,
+    robots: 'noindex, nofollow',
+    activeView: 'appView'
+  }
+};
+
+/**
+ * Transforms the base SPA index.html into route-specific initial HTML
+ * ensuring that canonical tags, titles, meta descriptions, and visible containers
+ * match the requested route on initial page load without relying on client-side JS hydration.
+ */
+export function buildRouteHtml(baseHtml, pathname) {
+  const cleanPath = pathname.replace(/\/+$/, '') || '/';
+  const meta = ROUTE_METADATA[cleanPath] || ROUTE_METADATA['/'];
+
+  let html = baseHtml;
+
+  // 1. Title tag
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${meta.title}</title>`);
+
+  // 2. Meta description
+  html = html.replace(
+    /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="description" content="${meta.description}">`
+  );
+
+  // 3. Meta robots directive
+  if (/<meta\s+name="robots"/i.test(html)) {
+    html = html.replace(
+      /<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/i,
+      `<meta name="robots" content="${meta.robots}">`
+    );
+  } else {
+    html = html.replace(
+      /<link\s+rel="canonical"/i,
+      `<meta name="robots" content="${meta.robots}">\n  <link rel="canonical"`
+    );
+  }
+
+  // 4. Canonical URL tag
+  html = html.replace(
+    /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i,
+    `<link rel="canonical" href="${meta.canonical}">`
+  );
+
+  // 5. Open Graph tags
+  html = html.replace(
+    /<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:title" content="${meta.title}">`
+  );
+  html = html.replace(
+    /<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:url" content="${meta.canonical}">`
+  );
+  html = html.replace(
+    /<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:description" content="${meta.description}">`
+  );
+
+  // 6. Twitter tags
+  html = html.replace(
+    /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="twitter:title" content="${meta.title}">`
+  );
+  html = html.replace(
+    /<meta\s+name="twitter:url"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="twitter:url" content="${meta.canonical}">`
+  );
+  html = html.replace(
+    /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="twitter:description" content="${meta.description}">`
+  );
+
+  // 7. Toggle initial view containers so target content is visible in initial HTML
+  if (meta.activeView === 'privacyView') {
+    html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
+    html = html.replace('id="privacyView" class="legal-container hidden"', 'id="privacyView" class="legal-container"');
+  } else if (meta.activeView === 'termsView') {
+    html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
+    html = html.replace('id="termsView" class="legal-container hidden"', 'id="termsView" class="legal-container"');
+  } else if (meta.activeView === 'appView') {
+    html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
+    html = html.replace('id="appView" class="app-container hidden"', 'id="appView" class="app-container"');
+  }
+
+  return html;
+}
+
+let cachedIndexHtml = null;
+let cachedIndexMtime = 0;
+const renderedPagesCache = new Map();
+
+export function getRenderedPage(cleanPath) {
+  const indexFile = path.join(DIST_DIR, 'index.html');
+  if (!fs.existsSync(indexFile)) {
+    return null;
+  }
+  const stat = fs.statSync(indexFile);
+  if (!cachedIndexHtml || stat.mtimeMs !== cachedIndexMtime) {
+    cachedIndexHtml = fs.readFileSync(indexFile, 'utf8');
+    cachedIndexMtime = stat.mtimeMs;
+    renderedPagesCache.clear();
+  }
+
+  if (renderedPagesCache.has(cleanPath)) {
+    return renderedPagesCache.get(cleanPath);
+  }
+
+  const rendered = buildRouteHtml(cachedIndexHtml, cleanPath);
+  renderedPagesCache.set(cleanPath, rendered);
+  return rendered;
+}
+
+export function handleHttpRequest(req, res) {
   // Always apply security headers to every response
   applySecurityHeaders(res);
 
   // 1. API Routes: /api/check and /api/quota (SEC-02: prevent unhandled promise rejections)
   const urlObj = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = urlObj.pathname;
+  const normalizedApiPath = pathname.replace(/\/+$/, '') || '/';
 
-  if (pathname === '/api/check') {
+  if (normalizedApiPath === '/api/check') {
     Promise.resolve(handleApiCheck(req, res)).catch(err => {
       console.error('[TeacherCheck Server] Unhandled error in /api/check:', err?.name || 'Error');
       if (!res.headersSent) {
@@ -57,7 +198,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (pathname === '/api/quota') {
+  if (normalizedApiPath === '/api/quota') {
     Promise.resolve(handleApiQuota(req, res)).catch(err => {
       console.error('[TeacherCheck Server] Unhandled error in /api/quota:', err?.name || 'Error');
       if (!res.headersSent) {
@@ -66,6 +207,14 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: 'An unexpected server error occurred.' }));
       }
     });
+    return;
+  }
+
+  // 1b. Unknown API endpoints: Return HTTP 404 JSON (never return SPA HTML for /api or /api/*)
+  if (pathname === '/api' || pathname.startsWith('/api/')) {
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Endpoint not found' }));
     return;
   }
 
@@ -123,11 +272,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 5. SPA Fallback: Serve dist/index.html for SPA routes (e.g. /, /app, /privacy, /terms)
-  const indexFile = path.join(DIST_DIR, 'index.html');
-  if (fs.existsSync(indexFile)) {
+  // 5. SPA Route Rendering & Fallback: Serve tailored HTML for /, /privacy, /terms, /app
+  const cleanPath = pathname.replace(/\/+$/, '') || '/';
+
+  // Apply noindex to /app and /app/
+  if (cleanPath === '/app') {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  }
+
+  const renderedHtml = getRenderedPage(cleanPath);
+  if (renderedHtml !== null) {
+    const bodyBuffer = Buffer.from(renderedHtml, 'utf8');
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Length', bodyBuffer.length);
     res.setHeader('Cache-Control', 'no-cache');
 
     if (req.method === 'HEAD') {
@@ -135,7 +293,7 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    fs.createReadStream(indexFile).pipe(res);
+    res.end(bodyBuffer);
     return;
   }
 
@@ -143,12 +301,18 @@ const server = http.createServer((req, res) => {
   res.statusCode = 500;
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.end('Production build not found. Please run "npm run build" first.');
-});
+}
 
-server.listen(PORT, () => {
-  console.log(`[TeacherCheck] Production server running on http://localhost:${PORT}`);
-  console.log(`[TeacherCheck] Serving static assets from: ${DIST_DIR}`);
-  console.log(`[TeacherCheck] Environment: ${process.env.NODE_ENV || 'production'}`);
-});
+const server = http.createServer(handleHttpRequest);
+
+// Only listen automatically when run directly as the main process
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+if (isMain) {
+  server.listen(PORT, () => {
+    console.log(`[TeacherCheck] Production server running on http://localhost:${PORT}`);
+    console.log(`[TeacherCheck] Serving static assets from: ${DIST_DIR}`);
+    console.log(`[TeacherCheck] Environment: ${process.env.NODE_ENV || 'production'}`);
+  });
+}
 
 export default server;
