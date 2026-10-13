@@ -72,8 +72,9 @@ describe('SEO Technical Routes & Canonical Verification', () => {
     assert.match(res.headers['content-type'], /text\/html/);
     assert.equal(res.headers['x-robots-tag'], undefined, 'Homepage must not have noindex tag');
 
-    // Title
-    assert.match(res.body, /<title>TeacherCheck — Fix Your English, Keep Your Voice<\/title>/);
+    // Title & Meta Description
+    assert.match(res.body, /<title>TeacherCheck — Free AI Grammar Checker That Keeps Your Voice<\/title>/);
+    assert.match(res.body, /<meta name="description" content="Fix English grammar mistakes without rewriting your personality. TeacherCheck helps correct genuine errors while keeping your words and writing style yours.">/);
     // Canonical
     assert.match(res.body, /<link rel="canonical" href="https:\/\/teachercheckai\.com\/">/);
     // Meta robots
@@ -83,6 +84,13 @@ describe('SEO Technical Routes & Canonical Verification', () => {
     assert.match(res.body, /id="privacyView" class="legal-container hidden"/);
     assert.match(res.body, /id="termsView" class="legal-container hidden"/);
     assert.match(res.body, /id="appView" class="app-container hidden"/);
+
+    // Heading Semantics: exactly 1 H1 on homepage; hidden legal headings are H2
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, 'Homepage initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /Free AI Grammar Checker/);
+    assert.match(res.body, /<h2\s+class="legal-title"\s+id="privacyHeading">Privacy Policy<\/h2>/);
+    assert.match(res.body, /<h2\s+class="legal-title"\s+id="termsHeading">Terms of Service<\/h2>/);
   });
 
   test('GET /privacy returns HTTP 200 with /privacy canonical and visible privacy container in initial HTML', async () => {
@@ -109,6 +117,12 @@ describe('SEO Technical Routes & Canonical Verification', () => {
     assert.match(res.body, /id="landingView" class="landing-container hidden"/);
     // Privacy copy content is present
     assert.match(res.body, /This Privacy Policy describes how we handle text/);
+
+    // Heading Semantics: exactly 1 H1 on /privacy (Privacy Policy); landing heading demoted to H2
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, '/privacy initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /Privacy Policy/);
+    assert.doesNotMatch(res.body, /<h1[^>]*id="landingHeroHeading"/);
   });
 
   test('GET /terms returns HTTP 200 with /terms canonical and visible terms container in initial HTML', async () => {
@@ -135,6 +149,12 @@ describe('SEO Technical Routes & Canonical Verification', () => {
     assert.match(res.body, /id="landingView" class="landing-container hidden"/);
     // Terms copy content is present
     assert.match(res.body, /TeacherCheck is an interactive English grammar checking application/);
+
+    // Heading Semantics: exactly 1 H1 on /terms (Terms of Service); landing heading demoted to H2
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, '/terms initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /Terms of Service/);
+    assert.doesNotMatch(res.body, /<h1[^>]*id="landingHeroHeading"/);
   });
 
   test('GET /app returns HTTP 200, X-Robots-Tag: noindex, nofollow, and visible app container', async () => {
@@ -156,6 +176,12 @@ describe('SEO Technical Routes & Canonical Verification', () => {
     assert.match(res.body, /id="appView" class="app-container"/);
     assert.doesNotMatch(res.body, /id="appView" class="app-container hidden"/);
     assert.match(res.body, /id="landingView" class="landing-container hidden"/);
+
+    // Heading Semantics: exactly 1 H1 on /app (TeacherCheck); landing heading demoted to H2
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, '/app initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /TeacherCheck/);
+    assert.doesNotMatch(res.body, /<h1[^>]*id="landingHeroHeading"/);
   });
 
   test('GET /app/ with trailing slash also returns X-Robots-Tag: noindex, nofollow', async () => {

@@ -41,8 +41,8 @@ const BASE_CANONICAL_URL = 'https://teachercheckai.com';
 
 export const ROUTE_METADATA = {
   '/': {
-    title: 'TeacherCheck — Fix Your English, Keep Your Voice',
-    description: 'Check your English without rewriting your personality. TeacherCheck corrects genuine mistakes and keeps your words yours.',
+    title: 'TeacherCheck — Free AI Grammar Checker That Keeps Your Voice',
+    description: 'Fix English grammar mistakes without rewriting your personality. TeacherCheck helps correct genuine errors while keeping your words and writing style yours.',
     canonical: `${BASE_CANONICAL_URL}/`,
     robots: 'index, follow',
     activeView: 'landingView'
@@ -137,16 +137,40 @@ export function buildRouteHtml(baseHtml, pathname) {
     `<meta name="twitter:description" content="${meta.description}">`
   );
 
-  // 7. Toggle initial view containers so target content is visible in initial HTML
+  // 7. Toggle initial view containers and heading hierarchy so target content is visible with correct primary H1
   if (meta.activeView === 'privacyView') {
     html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
     html = html.replace('id="privacyView" class="legal-container hidden"', 'id="privacyView" class="legal-container"');
+    html = html.replace(
+      /<h1(\s+class="hero-headline"\s+id="landingHeroHeading")>([\s\S]*?)<\/h1>/i,
+      '<h2$1>$2</h2>'
+    );
+    html = html.replace(
+      /<h2(\s+class="legal-title"\s+id="privacyHeading")>Privacy Policy<\/h2>/i,
+      '<h1$1>Privacy Policy</h1>'
+    );
   } else if (meta.activeView === 'termsView') {
     html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
     html = html.replace('id="termsView" class="legal-container hidden"', 'id="termsView" class="legal-container"');
+    html = html.replace(
+      /<h1(\s+class="hero-headline"\s+id="landingHeroHeading")>([\s\S]*?)<\/h1>/i,
+      '<h2$1>$2</h2>'
+    );
+    html = html.replace(
+      /<h2(\s+class="legal-title"\s+id="termsHeading")>Terms of Service<\/h2>/i,
+      '<h1$1>Terms of Service</h1>'
+    );
   } else if (meta.activeView === 'appView') {
     html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
     html = html.replace('id="appView" class="app-container hidden"', 'id="appView" class="app-container"');
+    html = html.replace(
+      /<h1(\s+class="hero-headline"\s+id="landingHeroHeading")>([\s\S]*?)<\/h1>/i,
+      '<h2$1>$2</h2>'
+    );
+    html = html.replace(
+      /<h2(\s+class="app-title"\s+id="appHeading")>TeacherCheck<\/h2>/i,
+      '<h1$1>TeacherCheck</h1>'
+    );
   }
 
   return html;

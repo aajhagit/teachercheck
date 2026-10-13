@@ -990,8 +990,8 @@ const BASE_CANONICAL_URL = 'https://teachercheckai.com';
 
 const PAGE_META = {
   landing: {
-    title: "TeacherCheck — Fix Your English, Keep Your Voice",
-    description: "Check your English without rewriting your personality. TeacherCheck corrects genuine mistakes and keeps your words yours.",
+    title: "TeacherCheck — Free AI Grammar Checker That Keeps Your Voice",
+    description: "Fix English grammar mistakes without rewriting your personality. TeacherCheck helps correct genuine errors while keeping your words and writing style yours.",
     url: `${BASE_CANONICAL_URL}/`
   },
   app: {
@@ -1045,6 +1045,45 @@ function updatePageMeta(pageKey) {
 }
 
 /**
+ * Ensures active view possesses the single primary H1 while inactive views remain H2
+ */
+function setHeadingTag(elementId, targetTag) {
+  const el = document.getElementById(elementId);
+  if (!el || el.tagName.toLowerCase() === targetTag.toLowerCase()) return;
+  const newEl = document.createElement(targetTag);
+  for (let i = 0; i < el.attributes.length; i++) {
+    const attr = el.attributes[i];
+    newEl.setAttribute(attr.name, attr.value);
+  }
+  newEl.innerHTML = el.innerHTML;
+  el.parentNode.replaceChild(newEl, el);
+}
+
+function updateActiveHeading(activeView) {
+  if (activeView === 'landing') {
+    setHeadingTag('landingHeroHeading', 'h1');
+    setHeadingTag('privacyHeading', 'h2');
+    setHeadingTag('termsHeading', 'h2');
+    setHeadingTag('appHeading', 'h2');
+  } else if (activeView === 'privacy') {
+    setHeadingTag('privacyHeading', 'h1');
+    setHeadingTag('landingHeroHeading', 'h2');
+    setHeadingTag('termsHeading', 'h2');
+    setHeadingTag('appHeading', 'h2');
+  } else if (activeView === 'terms') {
+    setHeadingTag('termsHeading', 'h1');
+    setHeadingTag('landingHeroHeading', 'h2');
+    setHeadingTag('privacyHeading', 'h2');
+    setHeadingTag('appHeading', 'h2');
+  } else if (activeView === 'app') {
+    setHeadingTag('appHeading', 'h1');
+    setHeadingTag('landingHeroHeading', 'h2');
+    setHeadingTag('privacyHeading', 'h2');
+    setHeadingTag('termsHeading', 'h2');
+  }
+}
+
+/**
  * Navigation View Handlers
  */
 function showPrivacyView(push = true) {
@@ -1053,6 +1092,7 @@ function showPrivacyView(push = true) {
   if (termsView) termsView.classList.add('hidden');
   if (privacyView) privacyView.classList.remove('hidden');
   updatePageMeta('privacy');
+  updateActiveHeading('privacy');
   if (push && window.location.pathname !== '/privacy') {
     try {
       window.history.pushState({ view: 'privacy' }, '', '/privacy');
@@ -1067,6 +1107,7 @@ function showTermsView(push = true) {
   if (privacyView) privacyView.classList.add('hidden');
   if (termsView) termsView.classList.remove('hidden');
   updatePageMeta('terms');
+  updateActiveHeading('terms');
   if (push && window.location.pathname !== '/terms') {
     try {
       window.history.pushState({ view: 'terms' }, '', '/terms');
@@ -1081,6 +1122,7 @@ function showAppView(push = true) {
   if (termsView) termsView.classList.add('hidden');
   if (appView) appView.classList.remove('hidden');
   updatePageMeta('app');
+  updateActiveHeading('app');
   if (push && window.location.pathname !== '/app') {
     try {
       window.history.pushState({ view: 'app' }, '', '/app');
@@ -1099,6 +1141,7 @@ function showLandingView(push = true) {
   if (termsView) termsView.classList.add('hidden');
   if (landingView) landingView.classList.remove('hidden');
   updatePageMeta('landing');
+  updateActiveHeading('landing');
   if (push && window.location.pathname !== '/') {
     try {
       window.history.pushState({ view: 'landing' }, '', '/');

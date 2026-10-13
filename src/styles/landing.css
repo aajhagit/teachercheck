@@ -159,6 +159,24 @@
   }
 }
 
+.hero-kicker {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-teacher);
+  margin-bottom: 12px;
+}
+
+@media (min-width: 640px) {
+  .hero-kicker {
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+}
+
 .hero-headline .highlight-words {
   color: var(--color-ink-student);
 }
