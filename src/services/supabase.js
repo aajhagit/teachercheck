@@ -15,14 +15,23 @@ export function normalizeSupabaseUrl(rawUrl) {
   }
 }
 
-// Retrieve environment variables for Supabase (compatible with both Vite and Node test environments)
-const env = (typeof import.meta !== 'undefined' && import.meta.env) 
-  ? import.meta.env 
-  : (typeof process !== 'undefined' && process.env ? process.env : {});
+export const DEFAULT_SUPABASE_URL = 'https://mxmzafzselbwjogfheha.supabase.co';
 
-const rawSupabaseUrl = env.VITE_SUPABASE_URL || '';
-const supabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl);
-const supabaseAnonKey = (env.VITE_SUPABASE_ANON_KEY || '').trim();
+/**
+ * Dynamically resolves Supabase URL and public anon key from import.meta.env or process.env.
+ * Supports VITE_SUPABASE_URL, SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and SUPABASE_ANON_KEY.
+ */
+export function getSupabaseConfig() {
+  const env = (typeof import.meta !== 'undefined' && import.meta.env)
+    ? import.meta.env
+    : (typeof process !== 'undefined' && process.env ? process.env : {});
+
+  const rawUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || '';
+  const anonKey = (env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '').trim();
+  const url = normalizeSupabaseUrl(rawUrl) || (anonKey ? DEFAULT_SUPABASE_URL : '');
+
+  return { url, anonKey };
+}
 
 let supabaseInstance = null;
 
@@ -30,27 +39,31 @@ let supabaseInstance = null;
  * Checks if Supabase client configuration is present in environment
  */
 export function isSupabaseConfigured() {
-  return Boolean(supabaseUrl && supabaseAnonKey);
+  const { url, anonKey } = getSupabaseConfig();
+  return Boolean(url && anonKey);
 }
 
 /**
  * Returns the singleton Supabase client or null if unconfigured
  */
 export function getSupabase() {
-  if (!isSupabaseConfigured()) {
+  const { url: supabaseUrl, anonKey: supabaseAnonKey } = getSupabaseConfig();
+  if (!supabaseUrl || !supabaseAnonKey) {
     return null;
   }
 
-  if (!supabaseInstance) {
+  if (!supabaseInstance || supabaseInstance._tcUrl !== supabaseUrl || supabaseInstance._tcKey !== supabaseAnonKey) {
     try {
       supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true,
-          storage: window.localStorage
+          storage: typeof window !== 'undefined' ? window.localStorage : undefined
         }
       });
+      supabaseInstance._tcUrl = supabaseUrl;
+      supabaseInstance._tcKey = supabaseAnonKey;
     } catch (err) {
       console.warn('[TeacherCheck Auth] Failed to initialize Supabase client:', err);
       return null;

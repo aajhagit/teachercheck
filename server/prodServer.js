@@ -3,7 +3,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { handleApiCheck, handleApiQuota } from './apiHandler.js';
+import { handleApiCheck, handleApiQuota, handleApiCreateOrder, handleApiVerifyPayment, handleApiRazorpayWebhook } from './apiHandler.js';
 import { applySecurityHeaders } from './securityHeaders.js';
 import { validateSessionSecret } from './cookieSession.js';
 
@@ -225,6 +225,42 @@ export function handleHttpRequest(req, res) {
   if (normalizedApiPath === '/api/quota') {
     Promise.resolve(handleApiQuota(req, res)).catch(err => {
       console.error('[TeacherCheck Server] Unhandled error in /api/quota:', err?.name || 'Error');
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'An unexpected server error occurred.' }));
+      }
+    });
+    return;
+  }
+
+  if (normalizedApiPath === '/api/create-order') {
+    Promise.resolve(handleApiCreateOrder(req, res)).catch(err => {
+      console.error('[TeacherCheck Server] Unhandled error in /api/create-order:', err?.name || 'Error');
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'An unexpected server error occurred.' }));
+      }
+    });
+    return;
+  }
+
+  if (normalizedApiPath === '/api/verify-payment') {
+    Promise.resolve(handleApiVerifyPayment(req, res)).catch(err => {
+      console.error('[TeacherCheck Server] Unhandled error in /api/verify-payment:', err?.name || 'Error');
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'An unexpected server error occurred.' }));
+      }
+    });
+    return;
+  }
+
+  if (normalizedApiPath === '/api/razorpay-webhook') {
+    Promise.resolve(handleApiRazorpayWebhook(req, res)).catch(err => {
+      console.error('[TeacherCheck Server] Unhandled error in /api/razorpay-webhook:', err?.name || 'Error');
       if (!res.headersSent) {
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');

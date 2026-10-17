@@ -82,6 +82,8 @@
   <link rel="stylesheet" href="/src/styles/main.css">
   <link rel="stylesheet" href="/src/styles/landing.css">
   <link rel="stylesheet" href="/src/styles/legal.css">
+  <link rel="stylesheet" href="/src/styles/checkout.css">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
 
@@ -102,6 +104,7 @@
         <span class="landing-brand-title">TeacherCheck</span>
       </a>
       <div class="landing-nav-actions" id="landingNavActions">
+        <button type="button" class="landing-nav-pro-btn" id="landingNavProBtn" title="Upgrade to TeacherCheck Pro">⚡ Pro</button>
         <button type="button" class="landing-nav-auth-btn" id="landingNavAuthBtn">Sign In</button>
         <div class="landing-user-menu hidden" id="landingUserMenu">
           <span class="landing-user-email" id="landingUserEmail"></span>
@@ -333,6 +336,7 @@
           &larr; Back to Overview
         </button>
         <div class="app-header-auth" id="appHeaderAuth">
+          <button type="button" class="app-pro-btn" id="appProBtn" title="Upgrade to TeacherCheck Pro">⚡ Upgrade to Pro</button>
           <button type="button" class="app-auth-btn" id="appAuthBtn">Sign In</button>
           <div class="app-user-menu hidden" id="appUserMenu">
             <span class="app-user-badge" id="appUserBadge" title="Signed in account">
@@ -420,6 +424,7 @@
               <p class="quota-banner-text">
                 You've used all 5 free grammar checks for today. Free checks reset at midnight UTC (<span id="quotaResetTime">00:00 UTC</span>). Come back tomorrow for 5 more checks!
               </p>
+              <button type="button" class="btn-quota-upgrade" id="quotaExceededUpgradeBtn">⚡ Upgrade to Pro for Unlimited Checks &rarr;</button>
             </div>
           </div>
 
@@ -968,6 +973,111 @@
       <div class="auth-switch-box" id="authSwitchBox">
         <span id="authSwitchPrompt">Don't have an account?</span>
         <button type="button" class="auth-switch-btn" id="authSwitchBtn">Create one now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 5. RAZORPAY CHECKOUT MODAL (TeacherCheck Pro)                -->
+  <!-- ============================================================ -->
+  <div id="checkoutModal" class="checkout-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="checkoutModalTitle">
+    <div class="checkout-modal-sheet">
+      <button type="button" class="modal-close-btn" id="checkoutModalCloseBtn" aria-label="Close dialog">&times;</button>
+
+      <div class="checkout-modal-header">
+        <div class="checkout-modal-badge">
+          <svg class="logo-pen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18"/>
+            <path d="M2 2l7.586 7.586"/>
+            <circle cx="11" cy="11" r="2"/>
+          </svg>
+          <h3 class="checkout-modal-title" id="checkoutModalTitle">TeacherCheck Pro</h3>
+        </div>
+        <p class="checkout-modal-subtitle">25 daily English grammar checks. Real teacher corrections for your writing.</p>
+      </div>
+
+      <!-- Plan Selection Options -->
+      <div class="checkout-plans-grid" role="radiogroup" aria-label="Choose a Pro subscription plan">
+        <!-- Pro Monthly -->
+        <div class="checkout-plan-option is-selected" id="planOptionMonthly" data-plan="pro_monthly" role="radio" aria-checked="true" tabindex="0">
+          <div class="checkout-plan-option-header">
+            <div class="checkout-plan-radio-circle"></div>
+            <div class="checkout-plan-option-info">
+              <span class="checkout-plan-option-title">Pro Monthly</span>
+              <span class="checkout-plan-option-sub">25 checks / day</span>
+            </div>
+            <div class="checkout-plan-option-pricing">
+              <span class="checkout-plan-price-currency">₹</span>
+              <span class="checkout-plan-price-val">199</span>
+              <span class="checkout-plan-price-period">/mo</span>
+            </div>
+          </div>
+          <div class="checkout-plan-option-desc">Billed monthly. 25 daily grammar checks. Cancel anytime.</div>
+        </div>
+
+        <!-- Pro Yearly -->
+        <div class="checkout-plan-option is-featured" id="planOptionYearly" data-plan="pro_yearly" role="radio" aria-checked="false" tabindex="0">
+          <div class="checkout-plan-value-pill">Save ₹389 • 16% Off vs Monthly</div>
+          <div class="checkout-plan-option-header">
+            <div class="checkout-plan-radio-circle"></div>
+            <div class="checkout-plan-option-info">
+              <span class="checkout-plan-option-title">Pro Yearly</span>
+              <span class="checkout-plan-option-sub">25 checks / day</span>
+            </div>
+            <div class="checkout-plan-option-pricing">
+              <span class="checkout-plan-price-currency">₹</span>
+              <span class="checkout-plan-price-val">1,999</span>
+              <span class="checkout-plan-price-period">/yr</span>
+            </div>
+          </div>
+          <div class="checkout-plan-option-desc">₹1,999 billed annually (effective ₹166/month). Saves ₹389 vs 12 months at ₹199.</div>
+        </div>
+      </div>
+
+      <!-- Plan Inclusions Card -->
+      <div class="checkout-plan-inclusions">
+        <div class="checkout-inclusions-title">All Pro plans include:</div>
+        <ul class="checkout-benefits-list">
+          <li class="checkout-benefit-item">
+            <span class="checkout-benefit-check">✓</span>
+            <span><strong>25 checks per day:</strong> 5x the Free tier for serious daily writing.</span>
+          </li>
+          <li class="checkout-benefit-item">
+            <span class="checkout-benefit-check">✓</span>
+            <span><strong>Teacher red-pen notes:</strong> Line-by-line strike-throughs & pedagogical explanations.</span>
+          </li>
+          <li class="checkout-benefit-item">
+            <span class="checkout-benefit-check">✓</span>
+            <span><strong>Preserve your voice:</strong> Authentic grammar corrections without AI corporate buzzwords.</span>
+          </li>
+          <li class="checkout-benefit-item">
+            <span class="checkout-benefit-check">✓</span>
+            <span><strong>Server-verified entitlement:</strong> Immediate activation upon payment verification.</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Status Feedback Banner -->
+      <div class="checkout-status-banner hidden" id="checkoutStatusBanner" role="status">
+        <span id="checkoutStatusIcon"></span>
+        <span id="checkoutStatusText"></span>
+      </div>
+
+      <!-- Razorpay Pay Button -->
+      <button type="button" class="checkout-pay-btn" id="razorpayCheckoutBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+          <line x1="2" y1="10" x2="22" y2="10"></line>
+        </svg>
+        <span id="checkoutPayBtnText">Subscribe to Pro Monthly — ₹199/month</span>
+      </button>
+
+      <div class="checkout-guarantee-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+        <span>Secured by Razorpay Subscriptions (SSL 256-bit encrypted).</span>
       </div>
     </div>
   </div>

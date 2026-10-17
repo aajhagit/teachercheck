@@ -3,6 +3,7 @@ import { rateLimiter } from './rateLimiter.js';
 import { dailyQuotaManager, getUtcMidnightReset } from './dailyQuota.js';
 import { getOrCreateAnonymousId, getPrivacySaltedIpHash } from './cookieSession.js';
 import { authService } from './authService.js';
+import { entitlementService } from './entitlementService.js';
 import { 
   applySecurityHeaders, 
   checkCorsOrigin, 
@@ -69,9 +70,14 @@ export async function handleApiQuota(req, res) {
 
     const identifier = authResult.authenticated ? `user:${authResult.user.id}` : anonIdentifier;
     
+    // Check Server-Side Pro Entitlement
+    const entitlement = await entitlementService.getUserEntitlement(identifier);
+    const userLimit = entitlement.isPro ? 25 : 5;
+
     let status;
     try {
       status = await dailyQuotaManager.getStatus(identifier, {
+        limit: userLimit,
         linkedIdentifier: authResult.authenticated ? anonIdentifier : null
       });
     } catch (err) {
@@ -106,7 +112,10 @@ export async function handleApiQuota(req, res) {
       remaining: status.remaining,
       used: status.used,
       resetAt: status.resetAt || status.resetsAt,
-      resetsAt: status.resetsAt
+      resetsAt: status.resetsAt,
+      plan: entitlement.isPro ? 'pro' : 'free',
+      planId: entitlement.planId || 'free',
+      dailyLimit: status.limit
     }));
   } catch (err) {
     logSafeEvent('QUOTA_HANDLER_ERROR', { errorType: err?.name || 'Error' });
@@ -267,9 +276,21 @@ export async function handleApiCheck(req, res) {
     const anonIdentifier = hasCookie ? `anon:${anonId}` : `ip:${getPrivacySaltedIpHash(clientIp, dateKey)}`;
 
     const identifier = authResult.authenticated ? `user:${authResult.user.id}` : anonIdentifier;
+
+    // Entitlement determines user limit (Free: 5, Pro: 25)
+    let userLimit = 5;
+    try {
+      const entitlement = await entitlementService.getUserEntitlement(identifier);
+      userLimit = entitlement.dailyLimit || (entitlement.isPro ? 25 : 5);
+    } catch (err) {
+      logSafeEvent('ENTITLEMENT_LOOKUP_ERROR', { errorType: err?.name || 'Error' });
+      userLimit = 5;
+    }
+
     let reservation;
     try {
       reservation = await dailyQuotaManager.reserveCheck(identifier, {
+        limit: userLimit,
         linkedIdentifier: authResult.authenticated ? anonIdentifier : null
       });
     } catch (err) {
@@ -373,12 +394,15 @@ export async function handleApiCheck(req, res) {
   }
 });
 
-req.on('error', (err) => {
-  logSafeEvent('REQUEST_STREAM_ERROR', { errorType: err?.name || 'StreamError' });
-  if (!res.headersSent) {
-    res.statusCode = 400;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Request connection error.' }));
-  }
-});
+  req.on('error', (err) => {
+    logSafeEvent('REQUEST_STREAM_ERROR', { errorType: err?.name || 'StreamError' });
+    if (!res.headersSent) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Request connection error.' }));
+    }
+  });
 }
+
+// Razorpay Payment & Webhook Endpoints
+export { handleApiCreateOrder, handleApiVerifyPayment, handleApiRazorpayWebhook } from './razorpayHandler.js';

@@ -25,11 +25,12 @@ export function getCspPolicy() {
 
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
+    "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://checkout.razorpay.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com",
-    `connect-src 'self' ${uniqueSupabaseOrigins} https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.googletagmanager.com`,
+    "img-src 'self' data: https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com https://*.razorpay.com",
+    `connect-src 'self' ${uniqueSupabaseOrigins} https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.googletagmanager.com https://api.razorpay.com https://lumberjack.razorpay.com`,
+    "frame-src 'self' https://api.razorpay.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'"
@@ -46,7 +47,7 @@ export function applySecurityHeaders(res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=*');
 }
 
 /**

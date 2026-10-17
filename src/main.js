@@ -10,6 +10,7 @@ import {
   formatAuthError,
   onAuthStateChange 
 } from './services/supabase.js';
+import { openRazorpayCheckout } from './services/razorpay.js';
 
 // DOM Elements
 const sentenceInput = document.getElementById('sentenceInput');
@@ -117,8 +118,24 @@ const authSubmitText = document.getElementById('authSubmitText');
 const authSwitchPrompt = document.getElementById('authSwitchPrompt');
 const authSwitchBtn = document.getElementById('authSwitchBtn');
 
+// Razorpay Checkout Elements
+const landingNavProBtn = document.getElementById('landingNavProBtn');
+const appProBtn = document.getElementById('appProBtn');
+const quotaExceededUpgradeBtn = document.getElementById('quotaExceededUpgradeBtn');
+const checkoutModal = document.getElementById('checkoutModal');
+const checkoutModalCloseBtn = document.getElementById('checkoutModalCloseBtn');
+const planOptionMonthly = document.getElementById('planOptionMonthly');
+const planOptionYearly = document.getElementById('planOptionYearly');
+const checkoutStatusBanner = document.getElementById('checkoutStatusBanner');
+const checkoutStatusIcon = document.getElementById('checkoutStatusIcon');
+const checkoutStatusText = document.getElementById('checkoutStatusText');
+const razorpayCheckoutBtn = document.getElementById('razorpayCheckoutBtn');
+const checkoutPayBtnText = document.getElementById('checkoutPayBtnText');
+
 let currentAuthMode = 'signin'; // 'signin' | 'signup' | 'forgot' | 'recovery'
 let currentUser = null;
+let isProUser = false;
+let selectedPlanId = 'pro_monthly'; // 'pro_monthly' (₹199/mo) | 'pro_yearly' (₹1,999/yr)
 
 let currentQuota = {
   limit: 5,
@@ -149,23 +166,39 @@ function init() {
 
 function updateQuotaUI(quota) {
   if (!quota) return;
+
+  const isPro = quota.plan === 'pro' || (typeof quota.limit === 'number' && quota.limit > 5);
+  isProUser = isPro;
+
+  const limit = typeof quota.limit === 'number' ? quota.limit : (isPro ? 25 : 5);
+  const remaining = typeof quota.remaining === 'number' ? quota.remaining : limit;
+
   currentQuota = {
-    limit: typeof quota.limit === 'number' ? quota.limit : 5,
-    remaining: typeof quota.remaining === 'number' ? quota.remaining : 5,
-    resetAt: quota.resetAt || null
+    limit,
+    remaining,
+    resetAt: quota.resetAt || quota.resetsAt || null
   };
+
+  if (notebookAccountStatus) {
+    if (currentUser?.email) {
+      notebookAccountStatus.textContent = isPro ? `${currentUser.email} (Pro)` : currentUser.email;
+    } else {
+      notebookAccountStatus.textContent = isPro ? 'Student (Pro)' : 'Guest Student';
+    }
+  }
 
   if (quotaRemainingNum) {
     quotaRemainingNum.textContent = currentQuota.remaining;
   }
 
   if (quotaHeaderItem) {
+    const tierName = isPro ? 'Pro' : 'Free';
     if (currentQuota.remaining <= 0) {
       quotaHeaderItem.classList.add('depleted');
-      quotaHeaderItem.title = "Daily free limit reached (0/5 left today). Resets at midnight UTC.";
+      quotaHeaderItem.title = `Daily ${tierName} limit reached (0/${limit} left today). Resets at midnight UTC.`;
     } else {
       quotaHeaderItem.classList.remove('depleted');
-      quotaHeaderItem.title = `Free daily grammar checks (${currentQuota.remaining}/5 left today). Resets at midnight UTC.`;
+      quotaHeaderItem.title = `${tierName} daily grammar checks (${currentQuota.remaining}/${limit} left today). Resets at midnight UTC.`;
     }
   }
 
@@ -179,7 +212,7 @@ function updateQuotaUI(quota) {
       quotaExceededBanner.classList.remove('hidden');
       if (checkBtn) {
         checkBtn.disabled = true;
-        checkBtn.title = "Daily free limit reached (5/5 checks used today)";
+        checkBtn.title = `Daily limit reached (${limit}/${limit} checks used today)`;
       }
     } else {
       quotaExceededBanner.classList.add('hidden');
@@ -533,10 +566,57 @@ function attachEventListeners() {
     authForm.addEventListener('submit', handleAuthSubmit);
   }
 
-  // Keyboard accessibility: Escape key closes auth modal
+  // Razorpay Checkout Trigger & Modal Listeners
+  if (landingNavProBtn) {
+    landingNavProBtn.addEventListener('click', openCheckoutModal);
+  }
+  if (appProBtn) {
+    appProBtn.addEventListener('click', openCheckoutModal);
+  }
+  if (quotaExceededUpgradeBtn) {
+    quotaExceededUpgradeBtn.addEventListener('click', openCheckoutModal);
+  }
+  if (checkoutModalCloseBtn) {
+    checkoutModalCloseBtn.addEventListener('click', closeCheckoutModal);
+  }
+  if (checkoutModal) {
+    checkoutModal.addEventListener('click', (e) => {
+      if (e.target === checkoutModal) {
+        closeCheckoutModal();
+      }
+    });
+  }
+  if (planOptionMonthly) {
+    planOptionMonthly.addEventListener('click', () => selectCheckoutPlan('monthly'));
+    planOptionMonthly.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectCheckoutPlan('monthly');
+      }
+    });
+  }
+  if (planOptionYearly) {
+    planOptionYearly.addEventListener('click', () => selectCheckoutPlan('yearly'));
+    planOptionYearly.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectCheckoutPlan('yearly');
+      }
+    });
+  }
+  if (razorpayCheckoutBtn) {
+    razorpayCheckoutBtn.addEventListener('click', handleRazorpayCheckout);
+  }
+
+  // Keyboard accessibility: Escape key closes modals
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && authModal && !authModal.classList.contains('hidden')) {
-      closeAuthModal();
+    if (e.key === 'Escape') {
+      if (authModal && !authModal.classList.contains('hidden')) {
+        closeAuthModal();
+      }
+      if (checkoutModal && !checkoutModal.classList.contains('hidden')) {
+        closeCheckoutModal();
+      }
     }
   });
 }
@@ -732,6 +812,118 @@ function closeAuthModal() {
   }
   if (authPassword) authPassword.value = '';
   if (authConfirmPassword) authConfirmPassword.value = '';
+}
+
+// ============================================================
+// RAZORPAY CHECKOUT & PRO UPGRADE FLOW
+// ============================================================
+function openCheckoutModal() {
+  if (!currentUser) {
+    openAuthModal('signin');
+    showAuthNotice('Please sign in or create an account to subscribe to TeacherCheck Pro so your access is saved across your devices.', 'info');
+    return;
+  }
+  if (!checkoutModal) return;
+  hideCheckoutStatus();
+  checkoutModal.classList.remove('hidden');
+}
+
+function closeCheckoutModal() {
+  if (!checkoutModal) return;
+  checkoutModal.classList.add('hidden');
+  hideCheckoutStatus();
+}
+
+function showCheckoutStatus(message, type = 'info') {
+  if (!checkoutStatusBanner || !checkoutStatusText) return;
+  checkoutStatusBanner.className = `checkout-status-banner is-${type}`;
+  if (checkoutStatusIcon) {
+    if (type === 'loading') checkoutStatusIcon.textContent = '⏳';
+    else if (type === 'success') checkoutStatusIcon.textContent = '✓';
+    else if (type === 'error') checkoutStatusIcon.textContent = '⚠️';
+    else checkoutStatusIcon.textContent = 'ℹ️';
+  }
+  checkoutStatusText.textContent = message;
+  checkoutStatusBanner.classList.remove('hidden');
+}
+
+function hideCheckoutStatus() {
+  if (checkoutStatusBanner) {
+    checkoutStatusBanner.classList.add('hidden');
+  }
+}
+
+function selectCheckoutPlan(planId) {
+  const isYearly = planId === 'pro_yearly' || planId === 'yearly';
+  selectedPlanId = isYearly ? 'pro_yearly' : 'pro_monthly';
+
+  if (isYearly) {
+    planOptionYearly?.classList.add('is-selected');
+    planOptionYearly?.setAttribute('aria-checked', 'true');
+    planOptionMonthly?.classList.remove('is-selected');
+    planOptionMonthly?.setAttribute('aria-checked', 'false');
+    if (checkoutPayBtnText) {
+      checkoutPayBtnText.textContent = 'Subscribe to Pro Yearly — ₹1,999/year';
+    }
+  } else {
+    planOptionMonthly?.classList.add('is-selected');
+    planOptionMonthly?.setAttribute('aria-checked', 'true');
+    planOptionYearly?.classList.remove('is-selected');
+    planOptionYearly?.setAttribute('aria-checked', 'false');
+    if (checkoutPayBtnText) {
+      checkoutPayBtnText.textContent = 'Subscribe to Pro Monthly — ₹199/month';
+    }
+  }
+  hideCheckoutStatus();
+}
+
+async function handleRazorpayCheckout() {
+  if (razorpayCheckoutBtn) {
+    razorpayCheckoutBtn.disabled = true;
+  }
+  showCheckoutStatus('Connecting to Razorpay...', 'loading');
+
+  const token = await getAccessToken();
+
+  await openRazorpayCheckout({
+    planId: selectedPlanId,
+    name: 'TeacherCheck',
+    description: (selectedPlanId === 'pro_yearly' || selectedPlanId === 'yearly')
+      ? 'TeacherCheck Pro Yearly (25 checks/day)'
+      : 'TeacherCheck Pro Monthly (25 checks/day)',
+    userEmail: currentUser?.email || '',
+    userName: currentUser?.email ? currentUser.email.split('@')[0] : 'Student',
+    token,
+    onStart: () => {
+      showCheckoutStatus('Opening payment gateway...', 'loading');
+    },
+    onSuccess: async (paymentData) => {
+      if (razorpayCheckoutBtn) {
+        razorpayCheckoutBtn.disabled = false;
+      }
+      showCheckoutStatus(
+        `Payment successful! Payment ID: ${paymentData.razorpay_payment_id || 'verified'}. Your Pro account (25 checks/day) is now active!`,
+        'success'
+      );
+      // Fetch server source of truth for updated quota & entitlement
+      await fetchQuotaStatus();
+      if (quotaExceededBanner) {
+        quotaExceededBanner.classList.add('hidden');
+      }
+    },
+    onFailure: (err) => {
+      if (razorpayCheckoutBtn) {
+        razorpayCheckoutBtn.disabled = false;
+      }
+      showCheckoutStatus(err.message || 'Payment failed or was declined. Please try again.', 'error');
+    },
+    onDismiss: () => {
+      if (razorpayCheckoutBtn) {
+        razorpayCheckoutBtn.disabled = false;
+      }
+      showCheckoutStatus('Checkout was cancelled. You closed the Razorpay payment window.', 'info');
+    }
+  });
 }
 
 async function handleAuthSubmit(e) {

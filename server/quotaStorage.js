@@ -139,6 +139,58 @@ export class UpstashRedisStorage {
 
     return value;
   }
+
+  async getRaw(key) {
+    if (!this.isConfigured()) {
+      throw new Error('UPSTASH_STORAGE_UNCONFIGURED');
+    }
+
+    const res = await fetch(`${this.url}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(['GET', key]),
+      signal: this.getSignal()
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Upstash Redis error (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    return data.result ?? null;
+  }
+
+  async setRawWithTtl(key, value, ttlSeconds) {
+    if (!this.isConfigured()) {
+      throw new Error('UPSTASH_STORAGE_UNCONFIGURED');
+    }
+
+    const valStr = typeof value === 'string' ? value : JSON.stringify(value);
+    const command = (typeof ttlSeconds === 'number' && ttlSeconds > 0)
+      ? ['SET', key, valStr, 'EX', ttlSeconds]
+      : ['SET', key, valStr];
+
+    const res = await fetch(`${this.url}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(command),
+      signal: this.getSignal()
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Upstash Redis error (${res.status}): ${errText}`);
+    }
+
+    return value;
+  }
 }
 
 export class InMemoryQuotaStorage {
@@ -194,10 +246,30 @@ export class InMemoryQuotaStorage {
   async get(key) {
     const now = Date.now();
     const entry = this.store.get(key);
-    if (!entry || now > entry.expiresAt) {
+    if (!entry || (entry.expiresAt && now > entry.expiresAt)) {
       return 0;
     }
-    return entry.count;
+    return typeof entry.count === 'number' ? entry.count : 0;
+  }
+
+  async getRaw(key) {
+    const now = Date.now();
+    const entry = this.store.get(key);
+    if (!entry || (entry.expiresAt && now > entry.expiresAt)) {
+      if (entry) this.store.delete(key);
+      return null;
+    }
+    return entry.value !== undefined ? entry.value : entry.count;
+  }
+
+  async setRawWithTtl(key, value, ttlSeconds) {
+    const now = Date.now();
+    const expiresAt = (typeof ttlSeconds === 'number' && ttlSeconds > 0) ? now + (ttlSeconds * 1000) : null;
+    this.store.set(key, {
+      value: typeof value === 'string' ? value : JSON.stringify(value),
+      expiresAt
+    });
+    return value;
   }
 
   clear() {

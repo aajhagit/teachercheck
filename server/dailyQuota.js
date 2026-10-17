@@ -1,6 +1,7 @@
 import { createQuotaStorage } from './quotaStorage.js';
 
 export const DAILY_FREE_LIMIT = 5;
+export const DAILY_PRO_LIMIT = 25;
 export const DAILY_QUOTA_LIMIT = DAILY_FREE_LIMIT;
 
 /**
@@ -75,12 +76,13 @@ export class DailyQuotaManager {
    */
   async getStatus(identifier, options = {}) {
     const { dateKey, nextResetIso, nextResetEpoch, ttlSeconds } = getUtcMidnightReset();
+    const effectiveLimit = (typeof options.limit === 'number' && options.limit > 0) ? options.limit : this.limit;
 
     if (!this.storage.isConfigured()) {
       return {
         configured: false,
-        limit: this.limit,
-        remaining: this.limit,
+        limit: effectiveLimit,
+        remaining: effectiveLimit,
         used: 0,
         resetsAt: nextResetIso,
         resetsAtEpoch: nextResetEpoch
@@ -107,12 +109,12 @@ export class DailyQuotaManager {
         await this.storage.setWithTtl(linkedKey, effectiveCount, storageTtl).catch(() => {});
       }
 
-      const remaining = Math.max(0, this.limit - effectiveCount);
+      const remaining = Math.max(0, effectiveLimit - effectiveCount);
       return {
         configured: true,
-        limit: this.limit,
+        limit: effectiveLimit,
         remaining,
-        used: Math.min(this.limit, effectiveCount),
+        used: Math.min(effectiveLimit, effectiveCount),
         count: effectiveCount,
         resetAt: nextResetIso,
         resetsAt: nextResetIso,
@@ -121,13 +123,13 @@ export class DailyQuotaManager {
     }
 
     const count = await this.storage.get(key);
-    const remaining = Math.max(0, this.limit - count);
+    const remaining = Math.max(0, effectiveLimit - count);
 
     return {
       configured: true,
-      limit: this.limit,
+      limit: effectiveLimit,
       remaining,
-      used: Math.min(this.limit, count),
+      used: Math.min(effectiveLimit, count),
       count,
       resetAt: nextResetIso,
       resetsAt: nextResetIso,
@@ -143,13 +145,14 @@ export class DailyQuotaManager {
    */
   async reserveCheck(identifier, options = {}) {
     const { dateKey, nextResetIso, nextResetEpoch, ttlSeconds } = getUtcMidnightReset();
+    const effectiveLimit = (typeof options.limit === 'number' && options.limit > 0) ? options.limit : this.limit;
 
     if (!this.storage.isConfigured()) {
       return {
         allowed: false,
         unconfigured: true,
         error: 'Daily quota storage is not configured. UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production.',
-        limit: this.limit,
+        limit: effectiveLimit,
         remaining: 0,
         count: 0,
         resetAt: nextResetIso,
@@ -162,6 +165,10 @@ export class DailyQuotaManager {
     // Add 1 hour grace period to key TTL to handle clock skew across machines
     const storageTtl = ttlSeconds + 3600;
 
+    const limitExceededMsg = effectiveLimit === DAILY_FREE_LIMIT
+      ? `Daily free limit reached (${effectiveLimit}/${effectiveLimit} checks used today). Your allowance resets at midnight UTC.`
+      : `Daily limit reached (${effectiveLimit}/${effectiveLimit} checks used today). Your allowance resets at midnight UTC.`;
+
     // Quota continuity guard: prevent gaining a fresh allowance by signing in
     if (options.linkedIdentifier && options.linkedIdentifier !== identifier) {
       const linkedKey = this.buildKey(options.linkedIdentifier, dateKey);
@@ -171,17 +178,17 @@ export class DailyQuotaManager {
       ]);
 
       const effectiveCount = Math.max(mainCount, linkedCount);
-      if (effectiveCount >= this.limit) {
+      if (effectiveCount >= effectiveLimit) {
         return {
           allowed: false,
-          limit: this.limit,
+          limit: effectiveLimit,
           remaining: 0,
-          used: this.limit,
-          count: this.limit,
+          used: effectiveLimit,
+          count: effectiveLimit,
           resetAt: nextResetIso,
           resetsAt: nextResetIso,
           resetsAtEpoch: nextResetEpoch,
-          error: `Daily free limit reached (${this.limit}/${this.limit} checks used today). Your allowance resets at midnight UTC.`
+          error: limitExceededMsg
         };
       }
 
@@ -193,19 +200,19 @@ export class DailyQuotaManager {
     // Atomic increment in persistent storage
     const newCount = await this.storage.incrWithTtl(key, storageTtl);
 
-    if (newCount > this.limit) {
+    if (newCount > effectiveLimit) {
       // Revert reservation immediately so count does not inflate indefinitely
       await this.storage.decr(key);
       return {
         allowed: false,
-        limit: this.limit,
+        limit: effectiveLimit,
         remaining: 0,
-        used: this.limit,
-        count: this.limit,
+        used: effectiveLimit,
+        count: effectiveLimit,
         resetAt: nextResetIso,
         resetsAt: nextResetIso,
         resetsAtEpoch: nextResetEpoch,
-        error: `Daily free limit reached (${this.limit}/${this.limit} checks used today). Your allowance resets at midnight UTC.`
+        error: limitExceededMsg
       };
     }
 
@@ -217,8 +224,8 @@ export class DailyQuotaManager {
 
     return {
       allowed: true,
-      limit: this.limit,
-      remaining: Math.max(0, this.limit - newCount),
+      limit: effectiveLimit,
+      remaining: Math.max(0, effectiveLimit - newCount),
       used: newCount,
       count: newCount,
       resetAt: nextResetIso,

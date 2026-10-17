@@ -1,8 +1,10 @@
+import 'dotenv/config';
 import { defineConfig } from 'vite';
-import { handleApiCheck, handleApiQuota } from './server/apiHandler.js';
+import { handleApiCheck, handleApiQuota, handleApiCreateOrder, handleApiVerifyPayment, handleApiRazorpayWebhook } from './server/apiHandler.js';
 import { applySecurityHeaders } from './server/securityHeaders.js';
 
 export default defineConfig({
+  envPrefix: ['VITE_', 'SUPABASE_'],
   server: {
     watch: {
       ignored: ['**/scratch/**']
@@ -21,6 +23,9 @@ export default defineConfig({
         // Protected API routes
         server.middlewares.use('/api/quota', handleApiQuota);
         server.middlewares.use('/api/check', handleApiCheck);
+        server.middlewares.use('/api/create-order', handleApiCreateOrder);
+        server.middlewares.use('/api/verify-payment', handleApiVerifyPayment);
+        server.middlewares.use('/api/razorpay-webhook', handleApiRazorpayWebhook);
       }
     }
   ]
