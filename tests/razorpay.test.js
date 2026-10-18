@@ -12,6 +12,8 @@ import { dailyQuotaManager, DAILY_PRO_LIMIT, DAILY_FREE_LIMIT } from '../server/
 import { InMemoryQuotaStorage } from '../server/quotaStorage.js';
 import { handleHttpRequest } from '../server/prodServer.js';
 import { getCspPolicy } from '../server/securityHeaders.js';
+import { verifyPaymentSignature } from '../src/services/razorpay.js';
+import { authService } from '../server/authService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -737,10 +739,11 @@ describe('TeacherCheck Razorpay Payment & Subscription Suite', { concurrency: 1 
 
       assert.equal(res.statusCode, 200);
 
-      // Verify user entitlement is no longer active
+      // Verify user entitlement status is updated to cancelled, but retains Pro while unexpired
       const ent = await entitlementService.getUserEntitlement(targetUser);
-      assert.equal(ent.isPro, false);
-      assert.equal(ent.dailyLimit, 5, 'Cancelled subscription reverts to 5 free checks/day');
+      assert.equal(ent.status, 'cancelled');
+      assert.equal(ent.isPro, true, 'Cancelled subscription retains Pro access while unexpired');
+      assert.equal(ent.dailyLimit, 25, 'Cancelled subscription retains 25 checks/day while unexpired');
     });
   });
 
@@ -1020,6 +1023,450 @@ describe('TeacherCheck Razorpay Payment & Subscription Suite', { concurrency: 1 
         assert.equal(res.statusCode, 400, `Expected 400 for ${p}`);
         const data = JSON.parse(res.body);
         assert.match(data.error, /invalid plan/i);
+      }
+    });
+  });
+
+  // Requirement 18: Complete Audit Remediation Suite
+  describe('Requirement 18: Complete Audit Remediation Suite', () => {
+    const AUDIT_WEBHOOK_SECRET = 'wh_secret_audit_test_1234567890';
+
+    before(() => {
+      process.env.RAZORPAY_WEBHOOK_SECRET = AUDIT_WEBHOOK_SECRET;
+    });
+
+    after(() => {
+      delete process.env.RAZORPAY_WEBHOOK_SECRET;
+    });
+
+    function createSignedWebhookReq(payloadObj) {
+      const rawPayload = JSON.stringify(payloadObj);
+      const signature = crypto
+        .createHmac('sha256', AUDIT_WEBHOOK_SECRET)
+        .update(rawPayload)
+        .digest('hex');
+
+      return createMockReq({
+        url: '/api/razorpay-webhook',
+        headers: { 'x-razorpay-signature': signature },
+        body: rawPayload
+      });
+    }
+
+    // 1. Unexpired cancelled entitlement
+    test('1. Unexpired cancelled entitlement retains Pro quota (25 checks/day)', async () => {
+      const targetUser = `user:cancelled_unexpired_${Date.now()}`;
+      const futureDate = new Date(Date.now() + 20 * 86400 * 1000).toISOString();
+
+      await entitlementService.setUserEntitlement(targetUser, {
+        planId: 'pro_monthly',
+        status: 'active',
+        expiresAt: futureDate,
+        paymentId: 'pay_init_1'
+      });
+
+      // Cancellation webhook arrives
+      const webhookReq = createSignedWebhookReq({
+        event: 'subscription.cancelled',
+        payload: {
+          subscription: {
+            entity: {
+              id: `sub_canc_${Date.now()}`,
+              notes: {
+                identifier: targetUser,
+                planId: 'pro_monthly'
+              }
+            }
+          }
+        }
+      });
+      const webhookRes = createMockRes();
+      await handleApiRazorpayWebhook(webhookReq, webhookRes);
+      await webhookRes.waitForEnd();
+      assert.equal(webhookRes.statusCode, 200);
+
+      const ent = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(ent.status, 'cancelled');
+      assert.equal(ent.isPro, true, 'User must remain Pro while expiresAt is in future');
+      assert.equal(ent.dailyLimit, 25, 'Unexpired cancelled user must have 25 checks/day');
+      assert.equal(ent.expiresAt, futureDate, 'expiresAt must not be altered/extended by cancellation');
+    });
+
+    // 2. Expired cancelled entitlement
+    test('2. Expired cancelled entitlement reverts to Free quota (5 checks/day)', async () => {
+      const targetUser = `user:cancelled_expired_${Date.now()}`;
+      const pastDate = new Date(Date.now() - 3600 * 1000).toISOString();
+
+      await entitlementService.setUserEntitlement(targetUser, {
+        planId: 'pro_monthly',
+        status: 'cancelled',
+        expiresAt: pastDate,
+        paymentId: 'pay_expired_1'
+      });
+
+      const ent = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(ent.isPro, false, 'Expired subscription must not have Pro access');
+      assert.equal(ent.dailyLimit, 5, 'Expired subscription must revert to 5 checks/day');
+      assert.equal(ent.status, 'expired');
+    });
+
+    // 3. Unexpired halted entitlement
+    test('3. Unexpired halted entitlement retains paid Pro access until expiresAt', async () => {
+      const targetUser = `user:halted_${Date.now()}`;
+      const futureDate = new Date(Date.now() + 15 * 86400 * 1000).toISOString();
+
+      await entitlementService.setUserEntitlement(targetUser, {
+        planId: 'pro_monthly',
+        status: 'active',
+        expiresAt: futureDate,
+        paymentId: 'pay_halted_1'
+      });
+
+      const webhookReq = createSignedWebhookReq({
+        event: 'subscription.halted',
+        payload: {
+          subscription: {
+            entity: {
+              id: `sub_halt_${Date.now()}`,
+              notes: {
+                identifier: targetUser,
+                planId: 'pro_monthly'
+              }
+            }
+          }
+        }
+      });
+      const webhookRes = createMockRes();
+      await handleApiRazorpayWebhook(webhookReq, webhookRes);
+      await webhookRes.waitForEnd();
+      assert.equal(webhookRes.statusCode, 200);
+
+      const ent = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(ent.status, 'halted');
+      assert.equal(ent.isPro, true, 'Halted subscription retains Pro while unexpired');
+      assert.equal(ent.dailyLimit, 25);
+    });
+
+    // 4. Unexpired paused entitlement
+    test('4. Unexpired paused entitlement retains paid Pro access until expiresAt', async () => {
+      const targetUser = `user:paused_${Date.now()}`;
+      const futureDate = new Date(Date.now() + 10 * 86400 * 1000).toISOString();
+
+      await entitlementService.setUserEntitlement(targetUser, {
+        planId: 'pro_monthly',
+        status: 'active',
+        expiresAt: futureDate,
+        paymentId: 'pay_paused_1'
+      });
+
+      const webhookReq = createSignedWebhookReq({
+        event: 'subscription.paused',
+        payload: {
+          subscription: {
+            entity: {
+              id: `sub_pause_${Date.now()}`,
+              notes: {
+                identifier: targetUser,
+                planId: 'pro_monthly'
+              }
+            }
+          }
+        }
+      });
+      const webhookRes = createMockRes();
+      await handleApiRazorpayWebhook(webhookReq, webhookRes);
+      await webhookRes.waitForEnd();
+      assert.equal(webhookRes.statusCode, 200);
+
+      const ent = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(ent.status, 'paused');
+      assert.equal(ent.isPro, true, 'Paused subscription retains Pro while unexpired');
+      assert.equal(ent.dailyLimit, 25);
+    });
+
+    // 5. Duplicate webhook delivery
+    test('5. Duplicate webhook delivery is safely idempotent and does not corrupt entitlement', async () => {
+      const targetUser = `user:dup_wh_${Date.now()}`;
+      const paymentId = `pay_dup_${Date.now()}`;
+      const subId = `sub_dup_${Date.now()}`;
+
+      const payload = {
+        event: 'subscription.charged',
+        payload: {
+          subscription: {
+            entity: {
+              id: subId,
+              notes: { identifier: targetUser, planId: 'pro_monthly' }
+            }
+          },
+          payment: {
+            entity: {
+              id: paymentId
+            }
+          }
+        }
+      };
+
+      // First webhook delivery
+      const req1 = createSignedWebhookReq(payload);
+      const res1 = createMockRes();
+      await handleApiRazorpayWebhook(req1, res1);
+      await res1.waitForEnd();
+      assert.equal(res1.statusCode, 200);
+
+      const ent1 = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(ent1.isPro, true);
+      assert.equal(ent1.dailyLimit, 25);
+      const originalExpiresAt = ent1.expiresAt;
+
+      // Second identical webhook delivery (network retry from Razorpay)
+      const req2 = createSignedWebhookReq(payload);
+      const res2 = createMockRes();
+      await handleApiRazorpayWebhook(req2, res2);
+      await res2.waitForEnd();
+      assert.equal(res2.statusCode, 200);
+
+      const ent2 = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(ent2.isPro, true);
+      assert.equal(ent2.dailyLimit, 25);
+      assert.equal(ent2.expiresAt, originalExpiresAt, 'Expiration must not be corrupted by duplicate delivery');
+    });
+
+    // 6. payment.captured
+    test('6. payment.captured webhook event activates correct user Pro entitlement', async () => {
+      const targetUser = `user:captured_${Date.now()}`;
+      const paymentId = `pay_cap_${Date.now()}`;
+      const orderId = `order_cap_${Date.now()}`;
+
+      const webhookReq = createSignedWebhookReq({
+        event: 'payment.captured',
+        payload: {
+          payment: {
+            entity: {
+              id: paymentId,
+              order_id: orderId,
+              notes: {
+                identifier: targetUser,
+                planId: 'pro_monthly'
+              }
+            }
+          }
+        }
+      });
+      const webhookRes = createMockRes();
+      await handleApiRazorpayWebhook(webhookReq, webhookRes);
+      await webhookRes.waitForEnd();
+      assert.equal(webhookRes.statusCode, 200);
+
+      const ent = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(ent.isPro, true);
+      assert.equal(ent.dailyLimit, 25);
+      assert.equal(ent.paymentId, paymentId);
+      assert.equal(ent.status, 'active');
+    });
+
+    // 7. subscription.charged renewal
+    test('7. subscription.charged renewal extends existing Pro entitlement correctly', async () => {
+      const targetUser = `user:renew_${Date.now()}`;
+      const subId = `sub_renew_${Date.now()}`;
+      const month1Payment = `pay_m1_${Date.now()}`;
+      const month2Payment = `pay_m2_${Date.now()}`;
+
+      // Month 1: initial active subscription
+      await entitlementService.setUserEntitlement(targetUser, {
+        planId: 'pro_monthly',
+        status: 'active',
+        paymentId: month1Payment,
+        subscriptionId: subId
+      });
+
+      const entMonth1 = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(entMonth1.isPro, true);
+      assert.equal(entMonth1.paymentId, month1Payment);
+
+      // Month 2: recurring subscription charge webhook
+      const webhookReq = createSignedWebhookReq({
+        event: 'subscription.charged',
+        payload: {
+          subscription: {
+            entity: {
+              id: subId,
+              notes: { identifier: targetUser, planId: 'pro_monthly' }
+            }
+          },
+          payment: {
+            entity: {
+              id: month2Payment
+            }
+          }
+        }
+      });
+      const webhookRes = createMockRes();
+      await handleApiRazorpayWebhook(webhookReq, webhookRes);
+      await webhookRes.waitForEnd();
+      assert.equal(webhookRes.statusCode, 200);
+
+      const entMonth2 = await entitlementService.getUserEntitlement(targetUser);
+      assert.equal(entMonth2.isPro, true);
+      assert.equal(entMonth2.paymentId, month2Payment, 'Payment ID must update to month 2');
+      assert.equal(entMonth2.dailyLimit, 25);
+      assert.equal(entMonth2.status, 'active');
+    });
+
+    // 8. Duplicate payment verification
+    test('8. Duplicate payment verification handles replay idempotently and frontend treats as success', async () => {
+      const subId = `sub_dup_ver_${Date.now()}`;
+      const paymentId = `pay_dup_ver_${Date.now()}`;
+      const signature = crypto
+        .createHmac('sha256', TEST_KEY_SECRET)
+        .update(`${paymentId}|${subId}`)
+        .digest('hex');
+
+      // First verification: success
+      const req1 = createMockReq({
+        url: '/api/verify-payment',
+        body: {
+          planId: 'pro_monthly',
+          razorpay_subscription_id: subId,
+          razorpay_payment_id: paymentId,
+          razorpay_signature: signature
+        }
+      });
+      const res1 = createMockRes();
+      await handleApiVerifyPayment(req1, res1);
+      await res1.waitForEnd();
+      assert.equal(res1.statusCode, 200);
+      const data1 = JSON.parse(res1.body);
+      assert.equal(data1.success, true);
+      assert.equal(data1.dailyLimit, 25);
+
+      // Second verification (same payment_id): 409 with alreadyProcessed: true
+      const req2 = createMockReq({
+        url: '/api/verify-payment',
+        body: {
+          planId: 'pro_monthly',
+          razorpay_subscription_id: subId,
+          razorpay_payment_id: paymentId,
+          razorpay_signature: signature
+        }
+      });
+      const res2 = createMockRes();
+      await handleApiVerifyPayment(req2, res2);
+      await res2.waitForEnd();
+      assert.equal(res2.statusCode, 409);
+      const data2 = JSON.parse(res2.body);
+      assert.equal(data2.alreadyProcessed, true);
+      assert.equal(data2.code, 'PAYMENT_ALREADY_PROCESSED');
+
+      // Verify client-side verifyPaymentSignature treats this response as success
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = async () => {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              success: false,
+              alreadyProcessed: true,
+              code: 'PAYMENT_ALREADY_PROCESSED',
+              message: 'This payment has already been processed and verified.',
+              planId: 'pro_monthly'
+            })
+          };
+        };
+
+        const clientResult = await verifyPaymentSignature({
+          planId: 'pro_monthly',
+          razorpay_subscription_id: subId,
+          razorpay_payment_id: paymentId,
+          razorpay_signature: signature
+        });
+
+        assert.equal(clientResult.success, true, 'Frontend must treat already-processed payment as success');
+        assert.equal(clientResult.alreadyProcessed, true);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    // 9. Cross-user protection
+    test('9. Cross-user protection prevents one user payment from activating another user account', async () => {
+      const userAId = 'user_aaa_original';
+      const userBId = 'user_bbb_attacker';
+      const subId = `sub_cross_${Date.now()}`;
+      const paymentId = `pay_cross_${Date.now()}`;
+      const signature = crypto
+        .createHmac('sha256', TEST_KEY_SECRET)
+        .update(`${paymentId}|${subId}`)
+        .digest('hex');
+
+      const originalAuthClient = authService._client;
+      try {
+        authService._client = {
+          auth: {
+            getUser: async (token) => {
+              if (token === 'token_user_a') {
+                return { data: { user: { id: userAId, email: 'alice@example.com' } }, error: null };
+              }
+              if (token === 'token_user_b') {
+                return { data: { user: { id: userBId, email: 'bob@example.com' } }, error: null };
+              }
+              return { data: { user: null }, error: new Error('Invalid token') };
+            }
+          }
+        };
+
+        // User A completes valid payment verification
+        const reqA = createMockReq({
+          url: '/api/verify-payment',
+          headers: {
+            authorization: 'Bearer token_user_a'
+          },
+          body: {
+            planId: 'pro_monthly',
+            razorpay_subscription_id: subId,
+            razorpay_payment_id: paymentId,
+            razorpay_signature: signature
+          }
+        });
+        const resA = createMockRes();
+        await handleApiVerifyPayment(reqA, resA);
+        await resA.waitForEnd();
+        assert.equal(resA.statusCode, 200);
+
+        // Verify User A receives Pro
+        const entA = await entitlementService.getUserEntitlement(`user:${userAId}`);
+        assert.equal(entA.isPro, true);
+        assert.equal(entA.dailyLimit, 25);
+
+        // User B attempts to replay User A's payment ID and signature
+        const reqB = createMockReq({
+          url: '/api/verify-payment',
+          headers: {
+            authorization: 'Bearer token_user_b'
+          },
+          body: {
+            planId: 'pro_monthly',
+            razorpay_subscription_id: subId,
+            razorpay_payment_id: paymentId,
+            razorpay_signature: signature
+          }
+        });
+        const resB = createMockRes();
+        await handleApiVerifyPayment(reqB, resB);
+        await resB.waitForEnd();
+
+        // Must be rejected with HTTP 403 Forbidden
+        assert.equal(resB.statusCode, 403, 'Cross-user payment attempt must be rejected with HTTP 403');
+        const dataB = JSON.parse(resB.body);
+        assert.match(dataB.error, /another user account/i);
+
+        // User B must NOT receive Pro
+        const entB = await entitlementService.getUserEntitlement(`user:${userBId}`);
+        assert.equal(entB.isPro, false, 'User B must not receive Pro entitlement');
+        assert.equal(entB.dailyLimit, 5);
+      } finally {
+        authService._client = originalAuthClient;
       }
     });
   });

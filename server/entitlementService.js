@@ -54,34 +54,58 @@ export class EntitlementService {
 
       const entitlement = typeof raw === 'string' ? JSON.parse(raw) : raw;
 
-      if (!entitlement || entitlement.status !== 'active') {
+      if (!entitlement) {
         return {
           isPro: false,
           planId: FREE_PLAN.id,
           dailyLimit: FREE_PLAN.dailyLimit,
-          status: entitlement?.status || 'inactive'
+          status: 'free'
         };
       }
 
       // Verify expiration timestamp
+      let isExpired = false;
       if (entitlement.expiresAt) {
         const expiresTime = new Date(entitlement.expiresAt).getTime();
         if (!isNaN(expiresTime) && Date.now() > expiresTime) {
-          return {
-            isPro: false,
-            planId: FREE_PLAN.id,
-            dailyLimit: FREE_PLAN.dailyLimit,
-            status: 'expired',
-            expiredAt: entitlement.expiresAt
-          };
+          isExpired = true;
         }
+      } else {
+        isExpired = true;
+      }
+
+      if (isExpired) {
+        return {
+          isPro: false,
+          planId: FREE_PLAN.id,
+          dailyLimit: FREE_PLAN.dailyLimit,
+          status: 'expired',
+          expiredAt: entitlement.expiresAt || null
+        };
+      }
+
+      // Allowed subscription statuses that retain Pro access while unexpired:
+      // - 'active': active ongoing subscription / order
+      // - 'cancelled': subscription cancelled future renewals, but current paid period is unexpired
+      // - 'halted': subscription halted, but current paid period is unexpired
+      // - 'paused': subscription paused, but current paid period is unexpired
+      const proAllowedStatuses = ['active', 'cancelled', 'halted', 'paused'];
+      const currentStatus = entitlement.status || 'inactive';
+
+      if (!proAllowedStatuses.includes(currentStatus)) {
+        return {
+          isPro: false,
+          planId: FREE_PLAN.id,
+          dailyLimit: FREE_PLAN.dailyLimit,
+          status: currentStatus
+        };
       }
 
       return {
         isPro: true,
         planId: entitlement.planId || 'monthly',
         dailyLimit: entitlement.dailyLimit || 25,
-        status: 'active',
+        status: currentStatus,
         paymentId: entitlement.paymentId,
         subscriptionId: entitlement.subscriptionId || null,
         orderId: entitlement.orderId || null,
@@ -106,7 +130,8 @@ export class EntitlementService {
     paymentId,
     subscriptionId = null,
     orderId = null,
-    status = 'active'
+    status = 'active',
+    expiresAt = null
   }) {
     if (!identifier) {
       throw new Error('Identifier is required to set entitlement');
@@ -117,31 +142,80 @@ export class EntitlementService {
       throw new Error(`Invalid plan ID: ${planId}`);
     }
 
+    const key = this.buildEntitlementKey(identifier);
+    let existingRecord = null;
+    try {
+      const raw = await this.storage.getRaw(key);
+      if (raw) {
+        existingRecord = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      }
+    } catch {
+      // ignore
+    }
+
     const now = new Date();
     // Monthly: 30 days + 2 days grace; Yearly: 365 days + 2 days grace
     const durationDays = plan.interval === 'yearly' ? 367 : 32;
-    const ttlSeconds = durationDays * 86400;
-    const expiresAt = new Date(now.getTime() + (durationDays * 86400 * 1000)).toISOString();
+
+    let finalExpiresAt;
+    let ttlSeconds;
+
+    if (expiresAt) {
+      finalExpiresAt = expiresAt;
+      const msUntilExpiry = new Date(finalExpiresAt).getTime() - now.getTime();
+      ttlSeconds = Math.max(60, Math.ceil(msUntilExpiry / 1000));
+    } else if (status === 'cancelled' || status === 'halted' || status === 'paused') {
+      // Lifecycle change: preserve existing paid expiresAt, do NOT artificially extend
+      if (existingRecord?.expiresAt) {
+        finalExpiresAt = existingRecord.expiresAt;
+        const msUntilExpiry = new Date(finalExpiresAt).getTime() - now.getTime();
+        ttlSeconds = Math.max(60, Math.ceil(msUntilExpiry / 1000));
+      } else {
+        // No prior paid period exists; cannot grant unearned free period
+        finalExpiresAt = now.toISOString();
+        ttlSeconds = 60;
+      }
+    } else {
+      // Active new or renewed subscription/order
+      ttlSeconds = durationDays * 86400;
+      finalExpiresAt = new Date(now.getTime() + (durationDays * 86400 * 1000)).toISOString();
+    }
 
     const record = {
       identifier,
       planId: plan.id,
       dailyLimit: plan.dailyLimit,
       status,
-      paymentId,
-      subscriptionId,
-      orderId,
-      activatedAt: now.toISOString(),
-      expiresAt
+      paymentId: paymentId || existingRecord?.paymentId || null,
+      subscriptionId: subscriptionId || existingRecord?.subscriptionId || null,
+      orderId: orderId || existingRecord?.orderId || null,
+      activatedAt: existingRecord?.activatedAt || now.toISOString(),
+      expiresAt: finalExpiresAt
     };
 
-    const key = this.buildEntitlementKey(identifier);
     await this.storage.setRawWithTtl(key, JSON.stringify(record), ttlSeconds);
 
+    const isUnexpired = finalExpiresAt && (new Date(finalExpiresAt).getTime() > now.getTime());
+    const isPro = ['active', 'cancelled', 'halted', 'paused'].includes(status) && isUnexpired;
+
     return {
-      isPro: true,
+      isPro,
       ...record
     };
+  }
+
+  /**
+   * Retrieves recorded payment details for idempotency and audit verification.
+   */
+  async getPaymentRecord(paymentId) {
+    if (!paymentId || !this.storage || !this.storage.isConfigured()) {
+      return null;
+    }
+
+    const key = this.buildPaymentKey(paymentId);
+    const raw = await this.storage.getRaw(key);
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
   }
 
   /**

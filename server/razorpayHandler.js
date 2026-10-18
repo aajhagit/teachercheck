@@ -413,24 +413,6 @@ export async function handleApiVerifyPayment(req, res) {
       return;
     }
 
-    // 6. Idempotency Guard: prevent replay attacks
-    const isNewPayment = await entitlementService.checkAndRecordPaymentIdempotency(payment_id, {
-      planId: plan.id,
-      subscriptionId: subscription_id || null,
-      orderId: order_id || null
-    });
-
-    if (!isNewPayment) {
-      logSafeEvent('PAYMENT_REPLAY_DETECTED', { paymentId: payment_id });
-      res.statusCode = 409;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
-        success: false,
-        error: 'This payment has already been processed and verified.'
-      }));
-      return;
-    }
-
     const userInfo = await resolveUserIdentifier(req, res);
     const requiresAuth = req.headers['x-require-auth'] === 'true' || process.env.REQUIRE_AUTH_FOR_PAYMENT === 'true';
     if (requiresAuth && !userInfo.authenticated) {
@@ -439,6 +421,48 @@ export async function handleApiVerifyPayment(req, res) {
       res.end(JSON.stringify({
         success: false,
         error: 'Authentication required. Please sign in to verify your TeacherCheck Pro subscription.'
+      }));
+      return;
+    }
+
+    // 6. Idempotency Guard: prevent replay attacks & cross-user payment hijacking
+    const isNewPayment = await entitlementService.checkAndRecordPaymentIdempotency(payment_id, {
+      planId: plan.id,
+      subscriptionId: subscription_id || null,
+      orderId: order_id || null,
+      identifier: userInfo.identifier,
+      userId: userInfo.userId || null
+    });
+
+    if (!isNewPayment) {
+      logSafeEvent('PAYMENT_REPLAY_DETECTED', { paymentId: payment_id });
+      const existingPayment = await entitlementService.getPaymentRecord(payment_id);
+
+      // Check cross-user protection: if payment was originally recorded for a different user
+      if (existingPayment?.identifier && existingPayment.identifier !== userInfo.identifier) {
+        logSafeEvent('CROSS_USER_PAYMENT_REPLAY_BLOCKED', {
+          paymentId: payment_id,
+          requestUser: userInfo.identifier,
+          originalUser: existingPayment.identifier
+        });
+        res.statusCode = 403;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          success: false,
+          error: 'This payment belongs to another user account.'
+        }));
+        return;
+      }
+
+      res.statusCode = 409;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        success: false,
+        alreadyProcessed: true,
+        code: 'PAYMENT_ALREADY_PROCESSED',
+        message: 'This payment has already been processed and verified.',
+        error: 'This payment has already been processed and verified.',
+        planId: plan.id
       }));
       return;
     }
@@ -598,14 +622,26 @@ export async function handleApiRazorpayWebhook(req, res) {
         const orderId = orderEntity.id || paymentEntity.order_id || null;
 
         if (identifier) {
-          await entitlementService.setUserEntitlement(identifier, {
+          const isNewPayment = await entitlementService.checkAndRecordPaymentIdempotency(paymentId, {
             planId,
-            paymentId,
             subscriptionId,
             orderId,
-            status: 'active'
+            identifier,
+            source: 'webhook'
           });
-          logSafeEvent('WEBHOOK_ENTITLEMENT_ACTIVATED', { identifier, planId, eventType });
+
+          if (!isNewPayment) {
+            logSafeEvent('WEBHOOK_DUPLICATE_PAYMENT', { paymentId, identifier, eventType });
+          } else {
+            await entitlementService.setUserEntitlement(identifier, {
+              planId,
+              paymentId,
+              subscriptionId,
+              orderId,
+              status: 'active'
+            });
+            logSafeEvent('WEBHOOK_ENTITLEMENT_ACTIVATED', { identifier, planId, eventType });
+          }
         }
         break;
       }

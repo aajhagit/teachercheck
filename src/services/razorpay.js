@@ -97,6 +97,18 @@ export async function verifyPaymentSignature({
 
   const data = await response.json().catch(() => ({}));
 
+  // Handle idempotent already-processed payment gracefully:
+  // If the backend indicates this specific payment was already processed and verified,
+  // treat as completed/success rather than a failed payment.
+  if (response.status === 409 && (data.alreadyProcessed === true || data.code === 'PAYMENT_ALREADY_PROCESSED')) {
+    return {
+      success: true,
+      alreadyProcessed: true,
+      message: data.message || 'This payment was already successfully processed.',
+      planId: data.planId || planId
+    };
+  }
+
   if (!response.ok || !data.success) {
     const errorMsg = data.error || 'Payment signature verification failed.';
     const error = new Error(errorMsg);
