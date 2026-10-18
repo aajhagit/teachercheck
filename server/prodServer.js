@@ -61,6 +61,41 @@ export const ROUTE_METADATA = {
     robots: 'index, follow',
     activeView: 'termsView'
   },
+  '/for-students': {
+    title: 'English Grammar Checker for Students — Fix Errors, Keep Your Voice | TeacherCheck',
+    description: 'Free English grammar checker for student essays, assignments, and research papers. Catch genuine grammar mistakes without AI rewriting your words or tone.',
+    canonical: `${BASE_CANONICAL_URL}/for-students`,
+    robots: 'index, follow',
+    activeView: 'forStudentsView'
+  },
+  '/for-ielts-writing': {
+    title: 'IELTS Writing Grammar Check — Teacher-Style Correction | TeacherCheck',
+    description: 'Improve your IELTS Academic and General Writing score. Catch genuine grammatical range and accuracy errors with clear teacher red-pen explanations.',
+    canonical: `${BASE_CANONICAL_URL}/for-ielts-writing`,
+    robots: 'index, follow',
+    activeView: 'forIeltsView'
+  },
+  '/vs-ai-rewriters': {
+    title: 'Why AI Rewriters Ruin Your Writing Style (And What to Use Instead) | TeacherCheck',
+    description: 'Tired of AI writing tools turning your natural sentences into stiff corporate jargon? Discover error-only red-pen correction that protects your authentic voice.',
+    canonical: `${BASE_CANONICAL_URL}/vs-ai-rewriters`,
+    robots: 'index, follow',
+    activeView: 'vsAiRewritersView'
+  },
+  '/grammar/its-vs-its': {
+    title: "It's vs Its: Rules, Easy Memory Tricks & Examples | TeacherCheck Grammar Guide",
+    description: "Confused between it's and its? Learn the exact grammatical difference, the apostrophe test, common student mistakes, and self-check quiz examples.",
+    canonical: `${BASE_CANONICAL_URL}/grammar/its-vs-its`,
+    robots: 'index, follow',
+    activeView: 'itsVsItsView'
+  },
+  '/grammar/affect-vs-effect': {
+    title: 'Affect vs Effect: Grammar Rules, The RAVEN Trick & Examples | TeacherCheck',
+    description: 'Master affect vs effect once and for all. Simple noun vs verb explanations, the famous RAVEN memory trick, common sentence mistakes, and teacher notes.',
+    canonical: `${BASE_CANONICAL_URL}/grammar/affect-vs-effect`,
+    robots: 'index, follow',
+    activeView: 'affectVsEffectView'
+  },
   '/app': {
     title: 'TeacherCheck — Red Pen Grammar Correction',
     description: 'Submit English sentences for instant, teacher-style red-pen grammar feedback while keeping your authentic tone.',
@@ -159,6 +194,61 @@ export function buildRouteHtml(baseHtml, pathname) {
     html = html.replace(
       /<h2(\s+class="legal-title"\s+id="termsHeading")>Terms of Service<\/h2>/i,
       '<h1$1>Terms of Service</h1>'
+    );
+  } else if (meta.activeView === 'forStudentsView') {
+    html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
+    html = html.replace('id="forStudentsView" class="legal-container hidden"', 'id="forStudentsView" class="legal-container"');
+    html = html.replace(
+      /<h1(\s+class="hero-headline"\s+id="landingHeroHeading")>([\s\S]*?)<\/h1>/i,
+      '<h2$1>$2</h2>'
+    );
+    html = html.replace(
+      /<h2(\s+class="legal-title"\s+id="forStudentsHeading")>([\s\S]*?)<\/h2>/i,
+      '<h1$1>$2</h1>'
+    );
+  } else if (meta.activeView === 'forIeltsView') {
+    html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
+    html = html.replace('id="forIeltsView" class="legal-container hidden"', 'id="forIeltsView" class="legal-container"');
+    html = html.replace(
+      /<h1(\s+class="hero-headline"\s+id="landingHeroHeading")>([\s\S]*?)<\/h1>/i,
+      '<h2$1>$2</h2>'
+    );
+    html = html.replace(
+      /<h2(\s+class="legal-title"\s+id="forIeltsHeading")>([\s\S]*?)<\/h2>/i,
+      '<h1$1>$2</h1>'
+    );
+  } else if (meta.activeView === 'vsAiRewritersView') {
+    html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
+    html = html.replace('id="vsAiRewritersView" class="legal-container hidden"', 'id="vsAiRewritersView" class="legal-container"');
+    html = html.replace(
+      /<h1(\s+class="hero-headline"\s+id="landingHeroHeading")>([\s\S]*?)<\/h1>/i,
+      '<h2$1>$2</h2>'
+    );
+    html = html.replace(
+      /<h2(\s+class="legal-title"\s+id="vsAiRewritersHeading")>([\s\S]*?)<\/h2>/i,
+      '<h1$1>$2</h1>'
+    );
+  } else if (meta.activeView === 'itsVsItsView') {
+    html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
+    html = html.replace('id="itsVsItsView" class="legal-container hidden"', 'id="itsVsItsView" class="legal-container"');
+    html = html.replace(
+      /<h1(\s+class="hero-headline"\s+id="landingHeroHeading")>([\s\S]*?)<\/h1>/i,
+      '<h2$1>$2</h2>'
+    );
+    html = html.replace(
+      /<h2(\s+class="legal-title"\s+id="itsVsItsHeading")>([\s\S]*?)<\/h2>/i,
+      '<h1$1>$2</h1>'
+    );
+  } else if (meta.activeView === 'affectVsEffectView') {
+    html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');
+    html = html.replace('id="affectVsEffectView" class="legal-container hidden"', 'id="affectVsEffectView" class="legal-container"');
+    html = html.replace(
+      /<h1(\s+class="hero-headline"\s+id="landingHeroHeading")>([\s\S]*?)<\/h1>/i,
+      '<h2$1>$2</h2>'
+    );
+    html = html.replace(
+      /<h2(\s+class="legal-title"\s+id="affectVsEffectHeading")>([\s\S]*?)<\/h2>/i,
+      '<h1$1>$2</h1>'
     );
   } else if (meta.activeView === 'appView') {
     html = html.replace('id="landingView" class="landing-container"', 'id="landingView" class="landing-container hidden"');

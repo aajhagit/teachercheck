@@ -55,6 +55,11 @@ const landingView = document.getElementById('landingView');
 const appView = document.getElementById('appView');
 const privacyView = document.getElementById('privacyView');
 const termsView = document.getElementById('termsView');
+const forStudentsView = document.getElementById('forStudentsView');
+const forIeltsView = document.getElementById('forIeltsView');
+const vsAiRewritersView = document.getElementById('vsAiRewritersView');
+const itsVsItsView = document.getElementById('itsVsItsView');
+const affectVsEffectView = document.getElementById('affectVsEffectView');
 const heroCtaBtn = document.getElementById('heroCtaBtn');
 const navCtaBtn = document.getElementById('navCtaBtn');
 const sectionCtaBtn = document.getElementById('sectionCtaBtn');
@@ -494,6 +499,21 @@ function attachEventListeners() {
       } else if (targetRoute === '/') {
         e.preventDefault();
         showLandingView(true);
+      } else if (targetRoute === '/for-students') {
+        e.preventDefault();
+        showForStudentsView(true);
+      } else if (targetRoute === '/for-ielts-writing') {
+        e.preventDefault();
+        showForIeltsView(true);
+      } else if (targetRoute === '/vs-ai-rewriters') {
+        e.preventDefault();
+        showVsAiRewritersView(true);
+      } else if (targetRoute === '/grammar/its-vs-its') {
+        e.preventDefault();
+        showItsVsItsView(true);
+      } else if (targetRoute === '/grammar/affect-vs-effect') {
+        e.preventDefault();
+        showAffectVsEffectView(true);
       }
     }
 
@@ -1200,6 +1220,31 @@ const PAGE_META = {
     title: "Terms of Service — TeacherCheck",
     description: "Read the TeacherCheck Terms of Service. Understand terms of use, educational guidance disclaimers, and service conditions.",
     url: `${BASE_CANONICAL_URL}/terms`
+  },
+  'for-students': {
+    title: "English Grammar Checker for Students — Fix Errors, Keep Your Voice | TeacherCheck",
+    description: "Free English grammar checker for student essays, assignments, and research papers. Catch genuine grammar mistakes without AI rewriting your words or tone.",
+    url: `${BASE_CANONICAL_URL}/for-students`
+  },
+  'for-ielts-writing': {
+    title: "IELTS Writing Grammar Check — Teacher-Style Correction | TeacherCheck",
+    description: "Improve your IELTS Academic and General Writing score. Catch genuine grammatical range and accuracy errors with clear teacher red-pen explanations.",
+    url: `${BASE_CANONICAL_URL}/for-ielts-writing`
+  },
+  'vs-ai-rewriters': {
+    title: "Why AI Rewriters Ruin Your Writing Style (And What to Use Instead) | TeacherCheck",
+    description: "Tired of AI writing tools turning your natural sentences into stiff corporate jargon? Discover error-only red-pen correction that protects your authentic voice.",
+    url: `${BASE_CANONICAL_URL}/vs-ai-rewriters`
+  },
+  'its-vs-its': {
+    title: "It's vs Its: Rules, Easy Memory Tricks & Examples | TeacherCheck Grammar Guide",
+    description: "Confused between it's and its? Learn the exact grammatical difference, the apostrophe test, common student mistakes, and self-check quiz examples.",
+    url: `${BASE_CANONICAL_URL}/grammar/its-vs-its`
+  },
+  'affect-vs-effect': {
+    title: "Affect vs Effect: Grammar Rules, The RAVEN Trick & Examples | TeacherCheck",
+    description: "Master affect vs effect once and for all. Simple noun vs verb explanations, the famous RAVEN memory trick, common sentence mistakes, and teacher notes.",
+    url: `${BASE_CANONICAL_URL}/grammar/affect-vs-effect`
   }
 };
 
@@ -1252,36 +1297,49 @@ function setHeadingTag(elementId, targetTag) {
 }
 
 function updateActiveHeading(activeView) {
-  if (activeView === 'landing') {
-    setHeadingTag('landingHeroHeading', 'h1');
-    setHeadingTag('privacyHeading', 'h2');
-    setHeadingTag('termsHeading', 'h2');
-    setHeadingTag('appHeading', 'h2');
-  } else if (activeView === 'privacy') {
-    setHeadingTag('privacyHeading', 'h1');
-    setHeadingTag('landingHeroHeading', 'h2');
-    setHeadingTag('termsHeading', 'h2');
-    setHeadingTag('appHeading', 'h2');
-  } else if (activeView === 'terms') {
-    setHeadingTag('termsHeading', 'h1');
-    setHeadingTag('landingHeroHeading', 'h2');
-    setHeadingTag('privacyHeading', 'h2');
-    setHeadingTag('appHeading', 'h2');
-  } else if (activeView === 'app') {
-    setHeadingTag('appHeading', 'h1');
-    setHeadingTag('landingHeroHeading', 'h2');
-    setHeadingTag('privacyHeading', 'h2');
-    setHeadingTag('termsHeading', 'h2');
+  const allHeadings = [
+    { id: 'landingHeroHeading', key: 'landing' },
+    { id: 'privacyHeading', key: 'privacy' },
+    { id: 'termsHeading', key: 'terms' },
+    { id: 'appHeading', key: 'app' },
+    { id: 'forStudentsHeading', key: 'for-students' },
+    { id: 'forIeltsHeading', key: 'for-ielts-writing' },
+    { id: 'vsAiRewritersHeading', key: 'vs-ai-rewriters' },
+    { id: 'itsVsItsHeading', key: 'its-vs-its' },
+    { id: 'affectVsEffectHeading', key: 'affect-vs-effect' }
+  ];
+
+  for (const h of allHeadings) {
+    if (h.key === activeView) {
+      setHeadingTag(h.id, 'h1');
+    } else {
+      setHeadingTag(h.id, 'h2');
+    }
   }
 }
 
 /**
  * Navigation View Handlers
  */
+function hideAllViews() {
+  const views = [
+    landingView,
+    appView,
+    privacyView,
+    termsView,
+    forStudentsView,
+    forIeltsView,
+    vsAiRewritersView,
+    itsVsItsView,
+    affectVsEffectView
+  ];
+  views.forEach(v => {
+    if (v) v.classList.add('hidden');
+  });
+}
+
 function showPrivacyView(push = true) {
-  if (landingView) landingView.classList.add('hidden');
-  if (appView) appView.classList.add('hidden');
-  if (termsView) termsView.classList.add('hidden');
+  hideAllViews();
   if (privacyView) privacyView.classList.remove('hidden');
   updatePageMeta('privacy');
   updateActiveHeading('privacy');
@@ -1294,9 +1352,7 @@ function showPrivacyView(push = true) {
 }
 
 function showTermsView(push = true) {
-  if (landingView) landingView.classList.add('hidden');
-  if (appView) appView.classList.add('hidden');
-  if (privacyView) privacyView.classList.add('hidden');
+  hideAllViews();
   if (termsView) termsView.classList.remove('hidden');
   updatePageMeta('terms');
   updateActiveHeading('terms');
@@ -1309,9 +1365,7 @@ function showTermsView(push = true) {
 }
 
 function showAppView(push = true) {
-  if (landingView) landingView.classList.add('hidden');
-  if (privacyView) privacyView.classList.add('hidden');
-  if (termsView) termsView.classList.add('hidden');
+  hideAllViews();
   if (appView) appView.classList.remove('hidden');
   updatePageMeta('app');
   updateActiveHeading('app');
@@ -1328,9 +1382,7 @@ function showAppView(push = true) {
 }
 
 function showLandingView(push = true) {
-  if (appView) appView.classList.add('hidden');
-  if (privacyView) privacyView.classList.add('hidden');
-  if (termsView) termsView.classList.add('hidden');
+  hideAllViews();
   if (landingView) landingView.classList.remove('hidden');
   updatePageMeta('landing');
   updateActiveHeading('landing');
@@ -1342,8 +1394,73 @@ function showLandingView(push = true) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function showForStudentsView(push = true) {
+  hideAllViews();
+  if (forStudentsView) forStudentsView.classList.remove('hidden');
+  updatePageMeta('for-students');
+  updateActiveHeading('for-students');
+  if (push && window.location.pathname !== '/for-students') {
+    try {
+      window.history.pushState({ view: 'for-students' }, '', '/for-students');
+    } catch {}
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showForIeltsView(push = true) {
+  hideAllViews();
+  if (forIeltsView) forIeltsView.classList.remove('hidden');
+  updatePageMeta('for-ielts-writing');
+  updateActiveHeading('for-ielts-writing');
+  if (push && window.location.pathname !== '/for-ielts-writing') {
+    try {
+      window.history.pushState({ view: 'for-ielts-writing' }, '', '/for-ielts-writing');
+    } catch {}
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showVsAiRewritersView(push = true) {
+  hideAllViews();
+  if (vsAiRewritersView) vsAiRewritersView.classList.remove('hidden');
+  updatePageMeta('vs-ai-rewriters');
+  updateActiveHeading('vs-ai-rewriters');
+  if (push && window.location.pathname !== '/vs-ai-rewriters') {
+    try {
+      window.history.pushState({ view: 'vs-ai-rewriters' }, '', '/vs-ai-rewriters');
+    } catch {}
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showItsVsItsView(push = true) {
+  hideAllViews();
+  if (itsVsItsView) itsVsItsView.classList.remove('hidden');
+  updatePageMeta('its-vs-its');
+  updateActiveHeading('its-vs-its');
+  if (push && window.location.pathname !== '/grammar/its-vs-its') {
+    try {
+      window.history.pushState({ view: 'its-vs-its' }, '', '/grammar/its-vs-its');
+    } catch {}
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showAffectVsEffectView(push = true) {
+  hideAllViews();
+  if (affectVsEffectView) affectVsEffectView.classList.remove('hidden');
+  updatePageMeta('affect-vs-effect');
+  updateActiveHeading('affect-vs-effect');
+  if (push && window.location.pathname !== '/grammar/affect-vs-effect') {
+    try {
+      window.history.pushState({ view: 'affect-vs-effect' }, '', '/grammar/affect-vs-effect');
+    } catch {}
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function handleRoute() {
-  const path = window.location.pathname.replace(/\/+$/, '');
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
   const hash = window.location.hash;
   const search = window.location.search;
 
@@ -1353,6 +1470,16 @@ function handleRoute() {
     showTermsView(false);
   } else if (path === '/app' || hash === '#app' || search.includes('app=1')) {
     showAppView(false);
+  } else if (path === '/for-students') {
+    showForStudentsView(false);
+  } else if (path === '/for-ielts-writing') {
+    showForIeltsView(false);
+  } else if (path === '/vs-ai-rewriters') {
+    showVsAiRewritersView(false);
+  } else if (path === '/grammar/its-vs-its') {
+    showItsVsItsView(false);
+  } else if (path === '/grammar/affect-vs-effect') {
+    showAffectVsEffectView(false);
   } else {
     showLandingView(false);
   }

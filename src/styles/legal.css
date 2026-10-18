@@ -294,3 +294,144 @@
   color: #9CA3AF;
   font-size: 10px;
 }
+
+/* Content & Educational Article Enhancements */
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.faq-item {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(70, 115, 175, 0.18);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.faq-item[open] {
+  background: #FFF;
+  border-color: var(--color-ink-teacher-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.faq-question {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: #1F2937;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.faq-question::-webkit-details-marker {
+  display: none;
+}
+
+.faq-question::after {
+  content: '+';
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--color-ink-teacher);
+  margin-left: 12px;
+  transition: transform 0.2s ease;
+}
+
+.faq-item[open] .faq-question::after {
+  content: '−';
+  transform: rotate(180deg);
+}
+
+.faq-answer {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.68;
+  color: #374151;
+  padding: 0 18px 16px 18px;
+  margin: 0;
+  border-top: 1px dashed rgba(70, 115, 175, 0.15);
+  padding-top: 12px;
+}
+
+.comparison-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 16px 0 22px;
+  border-radius: 8px;
+  border: 1px solid rgba(70, 115, 175, 0.2);
+  background: #FFF;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.comparison-table th {
+  background: #F8FAFC;
+  padding: 12px 14px;
+  font-weight: 600;
+  color: #1F2937;
+  border-bottom: 1.5px solid rgba(70, 115, 175, 0.2);
+}
+
+.comparison-table td {
+  padding: 12px 14px;
+  color: #374151;
+  border-bottom: 1px solid rgba(70, 115, 175, 0.1);
+  vertical-align: top;
+}
+
+.comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+.related-guides-box {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(70, 115, 175, 0.2);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-top: 24px;
+}
+
+.related-guides-title {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-ink-subtle);
+  margin-bottom: 10px;
+}
+
+.related-guides-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.related-guides-link {
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  color: var(--color-ink-teacher);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+}
+
+.related-guides-link:hover {
+  color: var(--color-ink-teacher-dark);
+}

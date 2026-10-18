@@ -195,6 +195,136 @@ describe('SEO Technical Routes & Canonical Verification', () => {
     assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
   });
 
+  test('GET /for-students returns HTTP 200 with /for-students canonical and visible forStudents container in initial HTML', async () => {
+    const req = createMockReq({ method: 'GET', url: '/for-students' });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.match(res.headers['content-type'], /text\/html/);
+    assert.equal(res.headers['x-robots-tag'], undefined, '/for-students must not have noindex tag');
+
+    assert.match(res.body, /<title>English Grammar Checker for Students — Fix Errors, Keep Your Voice \| TeacherCheck<\/title>/);
+    assert.match(res.body, /<link rel="canonical" href="https:\/\/teachercheckai\.com\/for-students">/);
+    assert.match(res.body, /<meta name="robots" content="index, follow">/);
+
+    assert.match(res.body, /id="forStudentsView" class="legal-container"/);
+    assert.doesNotMatch(res.body, /id="forStudentsView" class="legal-container hidden"/);
+    assert.match(res.body, /id="landingView" class="landing-container hidden"/);
+    assert.match(res.body, /Loss of Personal Academic Voice/);
+
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, '/for-students initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /English Grammar Checker for Students/);
+    assert.doesNotMatch(res.body, /<h1[^>]*id="landingHeroHeading"/);
+  });
+
+  test('GET /for-ielts-writing returns HTTP 200 with /for-ielts-writing canonical and visible forIelts container in initial HTML', async () => {
+    const req = createMockReq({ method: 'GET', url: '/for-ielts-writing' });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.match(res.headers['content-type'], /text\/html/);
+    assert.equal(res.headers['x-robots-tag'], undefined, '/for-ielts-writing must not have noindex tag');
+
+    assert.match(res.body, /<title>IELTS Writing Grammar Check — Teacher-Style Correction \| TeacherCheck<\/title>/);
+    assert.match(res.body, /<link rel="canonical" href="https:\/\/teachercheckai\.com\/for-ielts-writing">/);
+    assert.match(res.body, /<meta name="robots" content="index, follow">/);
+
+    assert.match(res.body, /id="forIeltsView" class="legal-container"/);
+    assert.doesNotMatch(res.body, /id="forIeltsView" class="legal-container hidden"/);
+    assert.match(res.body, /id="landingView" class="landing-container hidden"/);
+    assert.match(res.body, /Band 6 vs Band 7 Grammar Threshold/);
+
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, '/for-ielts-writing initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /IELTS Writing Grammar Checker/);
+    assert.doesNotMatch(res.body, /<h1[^>]*id="landingHeroHeading"/);
+  });
+
+  test('GET /vs-ai-rewriters returns HTTP 200 with /vs-ai-rewriters canonical and visible vsAiRewriters container in initial HTML', async () => {
+    const req = createMockReq({ method: 'GET', url: '/vs-ai-rewriters' });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.match(res.headers['content-type'], /text\/html/);
+    assert.equal(res.headers['x-robots-tag'], undefined, '/vs-ai-rewriters must not have noindex tag');
+
+    assert.match(res.body, /<title>Why AI Rewriters Ruin Your Writing Style \(And What to Use Instead\) \| TeacherCheck<\/title>/);
+    assert.match(res.body, /<link rel="canonical" href="https:\/\/teachercheckai\.com\/vs-ai-rewriters">/);
+    assert.match(res.body, /<meta name="robots" content="index, follow">/);
+
+    assert.match(res.body, /id="vsAiRewritersView" class="legal-container"/);
+    assert.doesNotMatch(res.body, /id="vsAiRewritersView" class="legal-container hidden"/);
+    assert.match(res.body, /id="landingView" class="landing-container hidden"/);
+    assert.match(res.body, /Why Fixing Grammar Is Better Than Paraphrasing/);
+
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, '/vs-ai-rewriters initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /TeacherCheck vs\. AI Rewriters/);
+    assert.doesNotMatch(res.body, /<h1[^>]*id="landingHeroHeading"/);
+  });
+
+  test('GET /grammar/its-vs-its returns HTTP 200 with canonical and visible itsVsIts container in initial HTML', async () => {
+    const req = createMockReq({ method: 'GET', url: '/grammar/its-vs-its' });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.match(res.headers['content-type'], /text\/html/);
+    assert.equal(res.headers['x-robots-tag'], undefined, '/grammar/its-vs-its must not have noindex tag');
+
+    assert.match(res.body, /<title>It's vs Its: Rules, Easy Memory Tricks & Examples \| TeacherCheck Grammar Guide<\/title>/);
+    assert.match(res.body, /<link rel="canonical" href="https:\/\/teachercheckai\.com\/grammar\/its-vs-its">/);
+    assert.match(res.body, /<meta name="robots" content="index, follow">/);
+
+    assert.match(res.body, /id="itsVsItsView" class="legal-container"/);
+    assert.doesNotMatch(res.body, /id="itsVsItsView" class="legal-container hidden"/);
+    assert.match(res.body, /id="landingView" class="landing-container hidden"/);
+    assert.match(res.body, /The 5-Second Rule to Never Confuse Them Again/);
+
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, '/grammar/its-vs-its initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /It's vs\. Its/);
+    assert.doesNotMatch(res.body, /<h1[^>]*id="landingHeroHeading"/);
+  });
+
+  test('GET /grammar/affect-vs-effect returns HTTP 200 with canonical and visible affectVsEffect container in initial HTML', async () => {
+    const req = createMockReq({ method: 'GET', url: '/grammar/affect-vs-effect' });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.match(res.headers['content-type'], /text\/html/);
+    assert.equal(res.headers['x-robots-tag'], undefined, '/grammar/affect-vs-effect must not have noindex tag');
+
+    assert.match(res.body, /<title>Affect vs Effect: Grammar Rules, The RAVEN Trick & Examples \| TeacherCheck<\/title>/);
+    assert.match(res.body, /<link rel="canonical" href="https:\/\/teachercheckai\.com\/grammar\/affect-vs-effect">/);
+    assert.match(res.body, /<meta name="robots" content="index, follow">/);
+
+    assert.match(res.body, /id="affectVsEffectView" class="legal-container"/);
+    assert.doesNotMatch(res.body, /id="affectVsEffectView" class="legal-container hidden"/);
+    assert.match(res.body, /id="landingView" class="landing-container hidden"/);
+    assert.match(res.body, /The RAVEN mnemonic/);
+
+    const h1Matches = res.body.match(/<h1[^>]*>[\s\S]*?<\/h1>/gi) || [];
+    assert.equal(h1Matches.length, 1, '/grammar/affect-vs-effect initial HTML must contain exactly one H1');
+    assert.match(h1Matches[0], /Affect vs\. Effect/);
+    assert.doesNotMatch(res.body, /<h1[^>]*id="landingHeroHeading"/);
+  });
+
   test('HEAD requests for public pages return status 200 with headers and empty body', async () => {
     const req = createMockReq({ method: 'HEAD', url: '/privacy' });
     const res = createMockRes();
@@ -288,6 +418,11 @@ describe('Sitemap & Robots.txt Integrity', () => {
     assert.match(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/<\/loc>/);
     assert.match(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/privacy<\/loc>/);
     assert.match(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/terms<\/loc>/);
+    assert.match(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/for-students<\/loc>/);
+    assert.match(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/for-ielts-writing<\/loc>/);
+    assert.match(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/vs-ai-rewriters<\/loc>/);
+    assert.match(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/grammar\/its-vs-its<\/loc>/);
+    assert.match(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/grammar\/affect-vs-effect<\/loc>/);
 
     // Must NOT contain /app
     assert.doesNotMatch(sitemapContent, /<loc>https:\/\/teachercheckai\.com\/app<\/loc>/);
@@ -297,7 +432,7 @@ describe('Sitemap & Robots.txt Integrity', () => {
 
     // All URLs must use HTTPS on production domain
     const locMatches = sitemapContent.match(/<loc>(.*?)<\/loc>/g) || [];
-    assert.equal(locMatches.length, 3, 'Sitemap should contain exactly 3 public canonical URLs');
+    assert.equal(locMatches.length, 8, 'Sitemap should contain exactly 8 public canonical URLs');
     for (const m of locMatches) {
       assert.ok(m.startsWith('<loc>https://teachercheckai.com/'), `URL must be HTTPS on teachercheckai.com: ${m}`);
     }
