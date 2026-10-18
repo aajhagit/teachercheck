@@ -288,7 +288,18 @@ export function handleHttpRequest(req, res) {
   }
 
   // 3. Resolve file path safely within DIST_DIR (Path Traversal Protection)
-  const decodedPath = decodeURIComponent(pathname);
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(pathname);
+  } catch (err) {
+    if (err instanceof URIError || err?.name === 'URIError') {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.end('Bad Request');
+      return;
+    }
+    throw err;
+  }
   const normalizedRelativePath = path.normalize(decodedPath).replace(/^(\.\.[\/\\])+/, '');
   const requestedFile = path.join(DIST_DIR, normalizedRelativePath);
 
