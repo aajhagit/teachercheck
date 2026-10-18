@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import { handleApiCreateOrder, handleApiVerifyPayment, handleApiRazorpayWebhook } from '../server/razorpayHandler.js';
-import { getPlanConfig, PLANS, FREE_PLAN } from '../server/plansConfig.js';
+import { getPlanConfig, resolveRazorpayPlanId, PLANS, FREE_PLAN } from '../server/plansConfig.js';
 import { entitlementService } from '../server/entitlementService.js';
 import { dailyQuotaManager, DAILY_PRO_LIMIT, DAILY_FREE_LIMIT } from '../server/dailyQuota.js';
 import { InMemoryQuotaStorage } from '../server/quotaStorage.js';
@@ -905,6 +905,121 @@ describe('TeacherCheck Razorpay Payment & Subscription Suite', { concurrency: 1 
         assert.equal(ent.dailyLimit, 5, 'Failed payment event must not activate Pro');
       } finally {
         delete process.env.RAZORPAY_WEBHOOK_SECRET;
+      }
+    });
+  });
+
+  // 17. Safe Server-Side Plan ID Mapping & Subscription Creation
+  describe('Requirement 17: Safe Server-Side Plan ID Mapping & Subscription Creation', () => {
+    test('resolveRazorpayPlanId correctly maps symbolic IDs to environment variables', () => {
+      process.env.RAZORPAY_MONTHLY_PLAN_ID = 'plan_live_month_123';
+      process.env.RAZORPAY_YEARLY_PLAN_ID = 'plan_live_year_456';
+
+      try {
+        assert.equal(resolveRazorpayPlanId('pro_monthly'), 'plan_live_month_123');
+        assert.equal(resolveRazorpayPlanId('monthly'), 'plan_live_month_123');
+        assert.equal(resolveRazorpayPlanId('pro_yearly'), 'plan_live_year_456');
+        assert.equal(resolveRazorpayPlanId('yearly'), 'plan_live_year_456');
+        assert.equal(resolveRazorpayPlanId('unknown_plan'), null);
+        assert.equal(resolveRazorpayPlanId(''), null);
+        assert.equal(resolveRazorpayPlanId(null), null);
+      } finally {
+        delete process.env.RAZORPAY_MONTHLY_PLAN_ID;
+        delete process.env.RAZORPAY_YEARLY_PLAN_ID;
+      }
+    });
+
+    test('resolveRazorpayPlanId ignores environment variables accidentally set to symbolic names', () => {
+      process.env.RAZORPAY_MONTHLY_PLAN_ID = 'pro_monthly';
+      process.env.RAZORPAY_YEARLY_PLAN_ID = 'pro_yearly';
+
+      try {
+        assert.equal(resolveRazorpayPlanId('pro_monthly'), null);
+        assert.equal(resolveRazorpayPlanId('pro_yearly'), null);
+      } finally {
+        delete process.env.RAZORPAY_MONTHLY_PLAN_ID;
+        delete process.env.RAZORPAY_YEARLY_PLAN_ID;
+      }
+    });
+
+    test('POST /api/create-order with symbolic planId creates Razorpay subscription using actual resolved plan ID', async () => {
+      process.env.RAZORPAY_MONTHLY_PLAN_ID = 'plan_monthly_real_dashboard_id_999';
+
+      try {
+        const req = createMockReq({
+          url: '/api/create-order',
+          body: { planId: 'pro_monthly' }
+        });
+        const res = createMockRes();
+        await handleApiCreateOrder(req, res);
+        await res.waitForEnd();
+
+        assert.equal(res.statusCode, 200);
+        const data = JSON.parse(res.body);
+        assert.equal(data.type, 'subscription');
+        assert.ok(data.subscription_id);
+        // Returns the symbolic plan_id to the client (never exposing server env plan ID)
+        assert.equal(data.plan_id, 'pro_monthly');
+        assert.equal(data.amount, 19900);
+        assert.equal(data.currency, 'INR');
+        assert.ok(!res.body.includes(process.env.RAZORPAY_KEY_SECRET));
+      } finally {
+        delete process.env.RAZORPAY_MONTHLY_PLAN_ID;
+      }
+    });
+
+    test('POST /api/create-order for pro_yearly creates subscription using resolved actual yearly plan ID', async () => {
+      process.env.RAZORPAY_YEARLY_PLAN_ID = 'plan_yearly_real_dashboard_id_888';
+
+      try {
+        const req = createMockReq({
+          url: '/api/create-order',
+          body: { planId: 'pro_yearly' }
+        });
+        const res = createMockRes();
+        await handleApiCreateOrder(req, res);
+        await res.waitForEnd();
+
+        assert.equal(res.statusCode, 200);
+        const data = JSON.parse(res.body);
+        assert.equal(data.type, 'subscription');
+        assert.ok(data.subscription_id);
+        assert.equal(data.plan_id, 'pro_yearly');
+        assert.equal(data.amount, 199900);
+      } finally {
+        delete process.env.RAZORPAY_YEARLY_PLAN_ID;
+      }
+    });
+
+    test('POST /api/create-subscription route alias works identically to /api/create-order', async () => {
+      const req = createMockReq({
+        url: '/api/create-subscription',
+        body: { planId: 'pro_monthly' }
+      });
+      const res = createMockRes();
+      await handleApiCreateOrder(req, res);
+      await res.waitForEnd();
+
+      assert.equal(res.statusCode, 200);
+      const data = JSON.parse(res.body);
+      assert.equal(data.amount, 19900);
+      assert.equal(data.plan_id, 'pro_monthly');
+    });
+
+    test('POST /api/create-order strictly rejects unknown symbolic planId with HTTP 400', async () => {
+      const invalidPlans = ['random_id', 'plan_xyz', '', 'free', '499'];
+      for (const p of invalidPlans) {
+        const req = createMockReq({
+          url: '/api/create-order',
+          body: { planId: p }
+        });
+        const res = createMockRes();
+        await handleApiCreateOrder(req, res);
+        await res.waitForEnd();
+
+        assert.equal(res.statusCode, 400, `Expected 400 for ${p}`);
+        const data = JSON.parse(res.body);
+        assert.match(data.error, /invalid plan/i);
       }
     });
   });

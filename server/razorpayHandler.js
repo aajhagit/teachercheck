@@ -1,7 +1,7 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { applySecurityHeaders, checkCorsOrigin, logSafeEvent } from './securityHeaders.js';
-import { getPlanConfig } from './plansConfig.js';
+import { getPlanConfig, resolveRazorpayPlanId } from './plansConfig.js';
 import { authService } from './authService.js';
 import { getOrCreateAnonymousId, getPrivacySaltedIpHash } from './cookieSession.js';
 import { rateLimiter } from './rateLimiter.js';
@@ -138,8 +138,8 @@ export async function handleApiCreateOrder(req, res) {
   }
 
   // 2. Validate Razorpay Server Credentials
-  const key_id = process.env.RAZORPAY_KEY_ID;
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  const key_id = (process.env.RAZORPAY_KEY_ID || '').replace(/^["']|["']$/g, '').trim();
+  const key_secret = (process.env.RAZORPAY_KEY_SECRET || '').replace(/^["']|["']$/g, '').trim();
 
   if (!key_id || !key_secret) {
     logSafeEvent('RAZORPAY_AUTH_FAILED', { reason: 'Missing credentials' });
@@ -206,9 +206,12 @@ export async function handleApiCreateOrder(req, res) {
       key_secret
     });
 
-    const configuredRazorpayPlanId = plan.getPlanId();
+    // Safely resolve the actual Razorpay plan ID from environment variables
+    // "pro_monthly" -> process.env.RAZORPAY_MONTHLY_PLAN_ID
+    // "pro_yearly"  -> process.env.RAZORPAY_YEARLY_PLAN_ID
+    const configuredRazorpayPlanId = resolveRazorpayPlanId(plan.id);
 
-    // Flow A: Razorpay Recurring Subscription (when plan ID is configured in environment)
+    // Flow A: Razorpay Recurring Subscription (when actual plan ID is configured in environment)
     if (configuredRazorpayPlanId) {
       const subscriptionOptions = {
         plan_id: configuredRazorpayPlanId,
@@ -221,6 +224,17 @@ export async function handleApiCreateOrder(req, res) {
           identifier: userInfo.identifier
         }
       };
+
+      // SAFE Diagnostic Logging: Verify incoming symbolic plan.id, resolved Razorpay Plan ID, and passed Plan ID
+      // Never logs secrets (RAZORPAY_KEY_SECRET, etc.)
+      console.log('[TeacherCheck Razorpay Subscription Diagnostic]', {
+        symbolicPlanId: plan.id,
+        resolvedPlanId: configuredRazorpayPlanId,
+        passedPlanId: subscriptionOptions.plan_id,
+        planIdLength: subscriptionOptions.plan_id.length,
+        keyMode: key_id.startsWith('rzp_live_') ? 'live' : (key_id.startsWith('rzp_test_') ? 'test' : 'unknown'),
+        keyIdPrefix: key_id.substring(0, 12)
+      });
 
       const subscription = await razorpay.subscriptions.create(subscriptionOptions);
 
@@ -264,6 +278,13 @@ export async function handleApiCreateOrder(req, res) {
       key_id
     }));
   } catch (err) {
+    console.error('[TeacherCheck Razorpay Create Order/Subscription Error]', {
+      statusCode: err.statusCode,
+      errorCode: err.error?.code,
+      errorDescription: err.error?.description,
+      errorField: err.error?.field,
+      errorReason: err.error?.reason
+    });
     const isAuthFailure = err.statusCode === 401 || (err.error?.code === 'BAD_REQUEST_ERROR' && /auth/i.test(err.error?.description || ''));
     res.statusCode = isAuthFailure ? 401 : (err.statusCode || 500);
     res.setHeader('Content-Type', 'application/json');
@@ -353,7 +374,7 @@ export async function handleApiVerifyPayment(req, res) {
   }
 
   // 4. Verify Secret Key Presence
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  const key_secret = (process.env.RAZORPAY_KEY_SECRET || '').replace(/^["']|["']$/g, '').trim();
   if (!key_secret) {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');

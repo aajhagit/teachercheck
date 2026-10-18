@@ -7,6 +7,39 @@
  * - PRO YEARLY: ₹1,999/year — 25 successful English grammar checks per day (Yearly recurring)
  */
 
+/**
+ * Safely maps frontend symbolic plan IDs to server-side configured Razorpay Plan IDs.
+ * - 'pro_monthly' -> process.env.RAZORPAY_MONTHLY_PLAN_ID
+ * - 'pro_yearly'  -> process.env.RAZORPAY_YEARLY_PLAN_ID
+ *
+ * Prevents symbolic IDs (e.g. "pro_monthly") from being passed as actual Razorpay Plan IDs,
+ * which would trigger Razorpay's "The ID provided is invalid or could not be found" error.
+ * Never exposes server-side plan configuration or secrets to the client.
+ */
+export function resolveRazorpayPlanId(symbolicPlanId) {
+  if (!symbolicPlanId || typeof symbolicPlanId !== 'string') return null;
+  const normalized = symbolicPlanId.trim().toLowerCase();
+
+  let envPlanId = null;
+  if (normalized === 'pro_monthly' || normalized === 'monthly') {
+    envPlanId = process.env.RAZORPAY_MONTHLY_PLAN_ID;
+  } else if (normalized === 'pro_yearly' || normalized === 'yearly') {
+    envPlanId = process.env.RAZORPAY_YEARLY_PLAN_ID;
+  } else {
+    return null;
+  }
+
+  if (!envPlanId || typeof envPlanId !== 'string') return null;
+  const cleaned = envPlanId.replace(/^["']|["']$/g, '').trim();
+
+  // If the env variable was erroneously set to the symbolic name itself, treat as unconfigured
+  if (!cleaned || cleaned === 'pro_monthly' || cleaned === 'pro_yearly' || cleaned === 'monthly' || cleaned === 'yearly') {
+    return null;
+  }
+
+  return cleaned;
+}
+
 export const PLANS = {
   pro_monthly: {
     id: 'pro_monthly',
@@ -15,7 +48,7 @@ export const PLANS = {
     currency: 'INR',
     interval: 'monthly',
     dailyLimit: 25,
-    getPlanId: () => (process.env.RAZORPAY_MONTHLY_PLAN_ID || '').trim() || null
+    getPlanId: () => resolveRazorpayPlanId('pro_monthly')
   },
   pro_yearly: {
     id: 'pro_yearly',
@@ -24,7 +57,7 @@ export const PLANS = {
     currency: 'INR',
     interval: 'yearly',
     dailyLimit: 25,
-    getPlanId: () => (process.env.RAZORPAY_YEARLY_PLAN_ID || '').trim() || null
+    getPlanId: () => resolveRazorpayPlanId('pro_yearly')
   }
 };
 
@@ -50,5 +83,5 @@ export function getPlanConfig(planId) {
   if (normalized === 'pro_yearly' || normalized === 'yearly') {
     return PLANS.pro_yearly;
   }
-  return PLANS[normalized] || null;
+  return null;
 }

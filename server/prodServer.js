@@ -234,9 +234,9 @@ export function handleHttpRequest(req, res) {
     return;
   }
 
-  if (normalizedApiPath === '/api/create-order') {
+  if (normalizedApiPath === '/api/create-order' || normalizedApiPath === '/api/create-subscription') {
     Promise.resolve(handleApiCreateOrder(req, res)).catch(err => {
-      console.error('[TeacherCheck Server] Unhandled error in /api/create-order:', err?.name || 'Error');
+      console.error('[TeacherCheck Server] Unhandled error in ' + normalizedApiPath + ':', err?.name || 'Error');
       if (!res.headersSent) {
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');

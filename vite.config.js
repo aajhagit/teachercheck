@@ -24,6 +24,7 @@ export default defineConfig({
         server.middlewares.use('/api/quota', handleApiQuota);
         server.middlewares.use('/api/check', handleApiCheck);
         server.middlewares.use('/api/create-order', handleApiCreateOrder);
+        server.middlewares.use('/api/create-subscription', handleApiCreateOrder);
         server.middlewares.use('/api/verify-payment', handleApiVerifyPayment);
         server.middlewares.use('/api/razorpay-webhook', handleApiRazorpayWebhook);
       }
