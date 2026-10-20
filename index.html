@@ -104,6 +104,7 @@
         <span class="landing-brand-title">TeacherCheck</span>
       </a>
       <div class="landing-nav-actions" id="landingNavActions">
+        <a href="#pricing" class="landing-nav-link" id="landingNavPricingLink">Pricing</a>
         <button type="button" class="landing-nav-pro-btn" id="landingNavProBtn" title="Upgrade to TeacherCheck Pro">⚡ Pro</button>
         <button type="button" class="landing-nav-auth-btn" id="landingNavAuthBtn">Sign In</button>
         <div class="landing-user-menu hidden" id="landingUserMenu">
@@ -303,7 +304,106 @@
       </div>
     </section>
 
-    <!-- 6. LIVE PRODUCT CTA SECTION -->
+    <!-- 6. PRICING SECTION -->
+    <section class="pricing-section" id="pricing">
+      <div>
+        <div class="section-kicker">Transparent Plans</div>
+        <h2 class="section-heading">Simple, honest pricing</h2>
+        <p class="pricing-subheading">
+          Start completely free. Upgrade anytime for 5x more daily grammar checks.
+        </p>
+      </div>
+
+      <div class="pricing-cards-grid">
+        <!-- Free Plan Card -->
+        <div class="pricing-card is-free">
+          <div class="pricing-card-header">
+            <span class="pricing-tier-tag">Standard Desk</span>
+            <h3 class="pricing-tier-name">Free Plan</h3>
+            <p class="pricing-tier-desc">For everyday casual writing and quick grammar checks.</p>
+            <div class="pricing-amount-row">
+              <span class="pricing-currency">₹</span>
+              <span class="pricing-figure">0</span>
+              <span class="pricing-period">/ forever</span>
+            </div>
+          </div>
+
+          <ul class="pricing-features-list">
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>5 checks per day:</strong> Resets every day at midnight UTC.</span>
+            </li>
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>Red-pen corrections:</strong> Strike-throughs & teacher notes.</span>
+            </li>
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>Preserves your voice:</strong> Zero corporate AI rewriting.</span>
+            </li>
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>No credit card required:</strong> Start checking right away.</span>
+            </li>
+          </ul>
+
+          <div class="pricing-card-footer">
+            <a href="/app" class="pricing-cta-btn is-free-cta" data-route="/app">
+              Check My English — Free
+            </a>
+          </div>
+        </div>
+
+        <!-- Pro Plan Card -->
+        <div class="pricing-card is-pro is-featured">
+          <div class="pricing-ribbon">Recommended • Save 16% Yearly</div>
+          <div class="pricing-card-header">
+            <span class="pricing-tier-tag">Teacher's Desk</span>
+            <h3 class="pricing-tier-name">TeacherCheck Pro</h3>
+            <p class="pricing-tier-desc">For students, IELTS candidates, and active writers.</p>
+            <div class="pricing-amount-row">
+              <span class="pricing-currency">₹</span>
+              <span class="pricing-figure">199</span>
+              <span class="pricing-period">/ month</span>
+            </div>
+            <div class="pricing-yearly-saving-hint">
+              or ₹1,999/year (effective ₹166/month • saves ₹389)
+            </div>
+          </div>
+
+          <ul class="pricing-features-list">
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>25 checks per day:</strong> 5x the Free tier for serious daily writing.</span>
+            </li>
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>Line-by-line teacher notes:</strong> Clear explanations for every fix.</span>
+            </li>
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>Full style protection:</strong> Slang, cadence & authentic voice.</span>
+            </li>
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>Cross-device account:</strong> Access your Pro limit anywhere.</span>
+            </li>
+            <li class="pricing-feature-item">
+              <span class="pricing-feature-check">✓</span>
+              <span><strong>Cancel anytime:</strong> Instant self-serve management.</span>
+            </li>
+          </ul>
+
+          <div class="pricing-card-footer">
+            <button type="button" class="pricing-cta-btn is-pro-cta" id="landingPricingUpgradeBtn">
+              ⚡ Upgrade to Pro &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. LIVE PRODUCT CTA SECTION -->
     <section class="cta-section">
       <h2 class="cta-heading">Try it yourself.</h2>
       <p class="cta-subheading">
@@ -317,11 +417,12 @@
       </a>
     </section>
 
-    <!-- 7. MINIMAL FOOTER -->
+    <!-- 8. MINIMAL FOOTER -->
     <footer class="landing-footer">
       <div class="footer-brand">TeacherCheck</div>
       <p class="footer-tagline">&ldquo;Your words. Your personality. Just fix the English.&rdquo;</p>
       <div class="footer-links">
+        <a href="#pricing" class="footer-link" id="footerPricingLink">Pricing</a>
         <a href="/for-students" class="footer-link" data-route="/for-students">For Students</a>
         <a href="/for-ielts-writing" class="footer-link" data-route="/for-ielts-writing">IELTS Writing</a>
         <a href="/vs-ai-rewriters" class="footer-link" data-route="/vs-ai-rewriters">vs AI Rewriters</a>
@@ -389,9 +490,9 @@
           <span class="notebook-header-label">Student:</span>
           <span class="notebook-header-value" id="notebookAccountStatus">Guest (Free)</span>
         </div>
-        <div class="notebook-header-item notebook-quota-item" id="quotaHeaderItem" title="Free daily grammar checks reset at midnight UTC">
-          <span class="notebook-header-label">Daily Free Plan:</span>
-          <span class="notebook-header-value" id="quotaCountDisplay"><strong id="quotaRemainingNum">5</strong> / 5 left</span>
+        <div class="notebook-header-item notebook-quota-item" id="quotaHeaderItem" title="Daily grammar checks reset at midnight UTC">
+          <span class="notebook-header-label" id="quotaHeaderLabel">Daily Free Plan:</span>
+          <span class="notebook-header-value" id="quotaCountDisplay"><strong id="quotaRemainingNum">5</strong> / <span id="quotaLimitNum">5</span> left</span>
         </div>
       </div>
 
@@ -429,11 +530,11 @@
               <polyline points="12 6 12 12 16 14"></polyline>
             </svg>
             <div class="quota-banner-body">
-              <span class="quota-banner-title">Daily free limit reached</span>
-              <p class="quota-banner-text">
-                You've used all 5 free grammar checks for today. Free checks reset at midnight UTC (<span id="quotaResetTime">00:00 UTC</span>). Come back tomorrow for 5 more checks!
+              <span class="quota-banner-title" id="quotaExceededTitle">Daily limit reached</span>
+              <p class="quota-banner-text" id="quotaExceededText">
+                You've used all 5 free grammar checks for today. Checks reset at midnight UTC (<span id="quotaResetTime">00:00 UTC</span>). Come back tomorrow for 5 more checks!
               </p>
-              <button type="button" class="btn-quota-upgrade" id="quotaExceededUpgradeBtn">⚡ Upgrade to Pro for Unlimited Checks &rarr;</button>
+              <button type="button" class="btn-quota-upgrade" id="quotaExceededUpgradeBtn">⚡ Upgrade to Pro for 25 Checks/Day &rarr;</button>
             </div>
           </div>
 
@@ -642,13 +743,13 @@
         </p>
         <ul class="legal-list">
           <li class="legal-list-item">
-            <strong>No User Accounts:</strong> You do not need to register, log in, or provide an email address, password, or profile information to check your English.
+            <strong>Optional User Accounts:</strong> You may use TeacherCheck as a guest with 5 free daily grammar checks without creating an account. If you choose to create an account or subscribe to TeacherCheck Pro, your account credentials and login sessions are managed securely through Supabase Authentication.
           </li>
           <li class="legal-list-item">
-            <strong>No Payment Information:</strong> TeacherCheck does not collect credit card numbers, billing addresses, or banking details.
+            <strong>Secure Payment Processing:</strong> Payments for TeacherCheck Pro (₹199/month or ₹1,999/year) are processed directly by Razorpay Subscriptions using industry-standard 256-bit SSL encryption. TeacherCheck does not store your credit card details, debit card numbers, or bank passwords on its servers. We only retain payment reference IDs and subscription status to maintain your Pro entitlement.
           </li>
           <li class="legal-list-item">
-            <strong>Anonymous Daily Quota Cookie:</strong> To provide 5 free grammar checks per day without requiring registration, we issue a secure, cryptographically signed, anonymous identifier cookie (<code>tc_anon_id</code>). This cookie contains only a random pseudonymous identifier, contains no personal information or submitted text, and is strictly used to maintain your daily free usage count across server restarts.
+            <strong>Anonymous Daily Quota Cookie:</strong> For guest users with 5 free grammar checks per day, we issue a secure, cryptographically signed, anonymous identifier cookie (<code>tc_anon_id</code>). This cookie contains only a random pseudonymous identifier, contains no personal information or submitted text, and is strictly used to maintain your daily free usage count across server restarts.
           </li>
           <li class="legal-list-item">
             <strong>Aggregate Usage Analytics:</strong> We use Google Analytics to measure aggregate website traffic and page interaction metrics. We do not run third-party advertising networks, and submitted sentences or writing samples are strictly excluded from analytics.
@@ -840,14 +941,35 @@
       </div>
 
       <div class="legal-section">
-        <h2 class="legal-heading">8. Modifications to the Service and Terms</h2>
+        <h2 class="legal-heading">8. Subscriptions, Payments & Cancellations</h2>
+        <p class="legal-paragraph">
+          TeacherCheck offers a Free tier and optional paid Pro subscriptions:
+        </p>
+        <ul class="legal-list">
+          <li class="legal-list-item">
+            <strong>Free Tier:</strong> Includes 5 free grammar checks per day, resetting daily at midnight UTC.
+          </li>
+          <li class="legal-list-item">
+            <strong>Pro Subscriptions:</strong> Includes 25 grammar checks per day, line-by-line red-pen explanations, and cross-device account access. Available at ₹199 per month or ₹1,999 per year (inclusive of applicable taxes).
+          </li>
+          <li class="legal-list-item">
+            <strong>Billing & Renewal:</strong> Subscriptions recur automatically on a monthly or yearly cycle from the date of initial payment until cancelled. Payments are securely processed via Razorpay Subscriptions.
+          </li>
+          <li class="legal-list-item">
+            <strong>Cancellation:</strong> You may cancel your subscription at any time. When cancelled, your Pro entitlement remains active until the end of your current paid billing period.
+          </li>
+        </ul>
+      </div>
+
+      <div class="legal-section">
+        <h2 class="legal-heading">9. Modifications to the Service and Terms</h2>
         <p class="legal-paragraph">
           We reserve the right to update, modify, or discontinue features of TeacherCheck at any time. Any changes to these Terms will be posted on this page with an updated effective date. Continued use of the Service following modifications constitutes your acceptance of the updated Terms.
         </p>
       </div>
 
       <div class="legal-section">
-        <h2 class="legal-heading">9. Contact Information</h2>
+        <h2 class="legal-heading">10. Contact Information</h2>
         <p class="legal-paragraph">
           For any questions or inquiries regarding these Terms of Service, please reach us at:
         </p>

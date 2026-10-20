@@ -79,8 +79,12 @@ const linkContact = document.getElementById('linkContact');
 
 // Daily Quota Elements & State
 const quotaRemainingNum = document.getElementById('quotaRemainingNum');
+const quotaLimitNum = document.getElementById('quotaLimitNum');
+const quotaHeaderLabel = document.getElementById('quotaHeaderLabel');
 const quotaHeaderItem = document.getElementById('quotaHeaderItem');
 const quotaExceededBanner = document.getElementById('quotaExceededBanner');
+const quotaExceededTitle = document.getElementById('quotaExceededTitle');
+const quotaExceededText = document.getElementById('quotaExceededText');
 const quotaResetTime = document.getElementById('quotaResetTime');
 
 // Auth Navigation & UI Elements
@@ -125,6 +129,7 @@ const authSwitchBtn = document.getElementById('authSwitchBtn');
 
 // Razorpay Checkout Elements
 const landingNavProBtn = document.getElementById('landingNavProBtn');
+const landingPricingUpgradeBtn = document.getElementById('landingPricingUpgradeBtn');
 const appProBtn = document.getElementById('appProBtn');
 const quotaExceededUpgradeBtn = document.getElementById('quotaExceededUpgradeBtn');
 const checkoutModal = document.getElementById('checkoutModal');
@@ -187,13 +192,41 @@ function updateQuotaUI(quota) {
   if (notebookAccountStatus) {
     if (currentUser?.email) {
       notebookAccountStatus.textContent = isPro ? `${currentUser.email} (Pro)` : currentUser.email;
+      notebookAccountStatus.title = isPro ? `Signed in as ${currentUser.email} (Pro Plan)` : `Signed in as ${currentUser.email}`;
     } else {
       notebookAccountStatus.textContent = isPro ? 'Student (Pro)' : 'Guest Student';
+      notebookAccountStatus.title = isPro ? 'Guest (Pro Plan)' : 'Guest student';
     }
   }
 
   if (quotaRemainingNum) {
     quotaRemainingNum.textContent = currentQuota.remaining;
+  }
+  if (quotaLimitNum) {
+    quotaLimitNum.textContent = currentQuota.limit;
+  }
+  if (quotaHeaderLabel) {
+    quotaHeaderLabel.textContent = isPro ? 'Daily Pro Plan:' : 'Daily Free Plan:';
+  }
+
+  if (appProBtn) {
+    if (isPro) {
+      appProBtn.innerHTML = '⚡ Pro Active';
+      appProBtn.title = 'TeacherCheck Pro Active — 25 checks/day';
+    } else {
+      appProBtn.innerHTML = '⚡ Upgrade to Pro';
+      appProBtn.title = 'Upgrade to TeacherCheck Pro';
+    }
+  }
+
+  if (landingNavProBtn) {
+    if (isPro) {
+      landingNavProBtn.innerHTML = '⚡ Pro Active';
+      landingNavProBtn.title = 'TeacherCheck Pro Active — 25 checks/day';
+    } else {
+      landingNavProBtn.innerHTML = '⚡ Pro';
+      landingNavProBtn.title = 'Upgrade to TeacherCheck Pro';
+    }
   }
 
   if (quotaHeaderItem) {
@@ -215,6 +248,22 @@ function updateQuotaUI(quota) {
   if (quotaExceededBanner) {
     if (currentQuota.remaining <= 0) {
       quotaExceededBanner.classList.remove('hidden');
+      if (quotaExceededTitle) {
+        quotaExceededTitle.textContent = isPro ? 'Daily Pro limit reached' : 'Daily free limit reached';
+      }
+      if (quotaExceededText) {
+        const timeStr = quotaResetTime ? quotaResetTime.textContent : '00:00 UTC';
+        quotaExceededText.innerHTML = isPro
+          ? `You've used all 25 Pro grammar checks for today. Checks reset at midnight UTC (<span id="quotaResetTime">${timeStr}</span>). Come back tomorrow for 25 more checks!`
+          : `You've used all 5 free grammar checks for today. Free checks reset at midnight UTC (<span id="quotaResetTime">${timeStr}</span>). Come back tomorrow for 5 more checks!`;
+      }
+      if (quotaExceededUpgradeBtn) {
+        if (isPro) {
+          quotaExceededUpgradeBtn.classList.add('hidden');
+        } else {
+          quotaExceededUpgradeBtn.classList.remove('hidden');
+        }
+      }
       if (checkBtn) {
         checkBtn.disabled = true;
         checkBtn.title = `Daily limit reached (${limit}/${limit} checks used today)`;
@@ -517,6 +566,21 @@ function attachEventListeners() {
       }
     }
 
+    const pricingAnchor = e.target.closest('a[href="#pricing"]');
+    if (pricingAnchor) {
+      e.preventDefault();
+      if (currentRoute !== '/') {
+        showLandingView(true);
+      }
+      setTimeout(() => {
+        const pricingEl = document.getElementById('pricing');
+        if (pricingEl) {
+          pricingEl.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 50);
+      return;
+    }
+
     if (e.target.closest('.footer-contact-btn')) {
       e.preventDefault();
       openModal(
@@ -589,6 +653,9 @@ function attachEventListeners() {
   // Razorpay Checkout Trigger & Modal Listeners
   if (landingNavProBtn) {
     landingNavProBtn.addEventListener('click', openCheckoutModal);
+  }
+  if (landingPricingUpgradeBtn) {
+    landingPricingUpgradeBtn.addEventListener('click', () => openCheckoutModal('yearly'));
   }
   if (appProBtn) {
     appProBtn.addEventListener('click', openCheckoutModal);
@@ -694,17 +761,30 @@ function updateAuthUI(user) {
   // Notebook Paper Header (Account status)
   if (notebookAccountStatus) {
     if (isAuthed) {
-      notebookAccountStatus.textContent = `${email} (Free)`;
-      notebookAccountStatus.title = `Signed in as ${email} (Free Plan)`;
+      notebookAccountStatus.textContent = isProUser ? `${email} (Pro)` : email;
+      notebookAccountStatus.title = `Signed in as ${email} (${isProUser ? 'Pro Plan' : 'Free Plan'})`;
     } else {
-      notebookAccountStatus.textContent = 'Guest (Free)';
-      notebookAccountStatus.title = 'Guest user (Free Plan)';
+      notebookAccountStatus.textContent = isProUser ? 'Student (Pro)' : 'Guest Student';
+      notebookAccountStatus.title = isProUser ? 'Guest (Pro Plan)' : 'Guest user (Free Plan)';
     }
   }
 }
 
-function showAuthNotice(type, message) {
+function showAuthNotice(typeOrMessage, maybeMessage) {
   if (!authNoticeBanner || !authNoticeText) return;
+  let type = 'info';
+  let message = '';
+
+  if (['error', 'success', 'info', 'loading'].includes(typeOrMessage)) {
+    type = typeOrMessage;
+    message = maybeMessage || '';
+  } else if (['error', 'success', 'info', 'loading'].includes(maybeMessage)) {
+    type = maybeMessage;
+    message = typeOrMessage || '';
+  } else {
+    message = typeOrMessage || maybeMessage || '';
+  }
+
   authNoticeBanner.className = `auth-notice-banner is-${type}`;
   if (authNoticeIcon) {
     if (type === 'error') authNoticeIcon.textContent = '⚠️';
@@ -837,14 +917,20 @@ function closeAuthModal() {
 // ============================================================
 // RAZORPAY CHECKOUT & PRO UPGRADE FLOW
 // ============================================================
-function openCheckoutModal() {
-  if (!currentUser) {
-    openAuthModal('signin');
-    showAuthNotice('Please sign in or create an account to subscribe to TeacherCheck Pro so your access is saved across your devices.', 'info');
-    return;
+function openCheckoutModal(initialPlanId) {
+  if (initialPlanId && (initialPlanId === 'pro_yearly' || initialPlanId === 'yearly')) {
+    selectCheckoutPlan('yearly');
+  } else if (initialPlanId && (initialPlanId === 'pro_monthly' || initialPlanId === 'monthly')) {
+    selectCheckoutPlan('monthly');
   }
+
+  if (isProUser) {
+    showCheckoutStatus('You already have an active TeacherCheck Pro subscription (25 daily checks). Thank you for supporting TeacherCheck!', 'success');
+  } else {
+    hideCheckoutStatus();
+  }
+
   if (!checkoutModal) return;
-  hideCheckoutStatus();
   checkoutModal.classList.remove('hidden');
 }
 
@@ -898,6 +984,18 @@ function selectCheckoutPlan(planId) {
 }
 
 async function handleRazorpayCheckout() {
+  if (isProUser) {
+    showCheckoutStatus('You already have an active TeacherCheck Pro subscription (25 daily checks).', 'success');
+    return;
+  }
+
+  if (!currentUser) {
+    closeCheckoutModal();
+    openAuthModal('signup');
+    showAuthNotice('info', 'Please create an account or sign in first to subscribe to TeacherCheck Pro so your access is saved across your devices.');
+    return;
+  }
+
   if (razorpayCheckoutBtn) {
     razorpayCheckoutBtn.disabled = true;
   }
@@ -935,7 +1033,15 @@ async function handleRazorpayCheckout() {
       if (razorpayCheckoutBtn) {
         razorpayCheckoutBtn.disabled = false;
       }
-      showCheckoutStatus(err.message || 'Payment failed or was declined. Please try again.', 'error');
+      if (err?.paymentCaptured && err.paymentId) {
+        showCheckoutStatus(
+          `Payment received by Razorpay (Payment ID: ${err.paymentId}). Your Pro activation is processing. Please refresh in a moment if your 25 daily checks do not appear immediately.`,
+          'info'
+        );
+        setTimeout(fetchQuotaStatus, 2000);
+      } else {
+        showCheckoutStatus(err.message || 'Payment could not be completed. Please try again.', 'error');
+      }
     },
     onDismiss: () => {
       if (razorpayCheckoutBtn) {
@@ -1576,13 +1682,21 @@ async function handleCheck() {
     if (quotaExceededBanner) {
       quotaExceededBanner.classList.remove('hidden');
     }
-    showError("Daily free limit reached (5/5 checks used today). Your free checks reset at midnight UTC.");
+    const tier = isProUser ? 'Pro' : 'Free';
+    const limit = currentQuota.limit || (isProUser ? 25 : 5);
+    showError(`Daily ${tier} limit reached (${limit}/${limit} checks used today). Your checks reset at midnight UTC.`);
     return;
   }
 
   const text = sentenceInput.value.trim();
   if (!text) {
     showError("Please write something in the notebook before checking.");
+    sentenceInput.focus();
+    return;
+  }
+
+  if (!/[a-zA-Z0-9]/.test(text)) {
+    showError("Please write an English sentence or phrase before checking.");
     sentenceInput.focus();
     return;
   }
@@ -1688,7 +1802,9 @@ function setLoadingState(isLoading) {
     sentenceInput.disabled = false;
     if (currentQuota.remaining <= 0) {
       checkBtn.disabled = true;
-      checkBtn.title = "Daily free limit reached (5/5 checks used today)";
+      const tier = isProUser ? 'Pro' : 'Free';
+      const limit = currentQuota.limit || (isProUser ? 25 : 5);
+      checkBtn.title = `Daily ${tier} limit reached (${limit}/${limit} checks used today)`;
     } else {
       checkBtn.disabled = false;
       checkBtn.title = "";

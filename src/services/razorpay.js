@@ -171,26 +171,44 @@ export async function openRazorpayCheckout({
         }
       },
       handler: async function (response) {
-        try {
-          // Verify with Backend
-          const verifyResult = await verifyPaymentSignature({
-            planId,
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_subscription_id: response.razorpay_subscription_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-            token
-          });
+        let verifyResult = null;
+        let lastErr = null;
 
+        // Try verification with immediate retry if transient network error occurs
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            verifyResult = await verifyPaymentSignature({
+              planId,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              token
+            });
+            break;
+          } catch (err) {
+            lastErr = err;
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 800));
+            }
+          }
+        }
+
+        if (verifyResult) {
           if (typeof onSuccess === 'function') {
             onSuccess({
               ...response,
               ...verifyResult
             });
           }
-        } catch (verifyErr) {
+        } else {
+          if (lastErr) {
+            lastErr.paymentCaptured = true;
+            lastErr.paymentId = response.razorpay_payment_id;
+            lastErr.paymentData = response;
+          }
           if (typeof onFailure === 'function') {
-            onFailure(verifyErr);
+            onFailure(lastErr);
           }
         }
       }

@@ -25,6 +25,14 @@
   justify-content: space-between;
   padding: 16px 0;
   border-bottom: 1px solid rgba(70, 115, 175, 0.16);
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .legal-nav {
+    padding: 10px 0;
+    gap: 6px;
+  }
 }
 
 .legal-nav-back {
@@ -42,11 +50,35 @@
   padding: 6px 10px;
   border-radius: 6px;
   transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .legal-nav-back {
+    font-size: 12.5px;
+    padding: 4px 6px;
+  }
 }
 
 .legal-nav-back:hover {
   color: var(--color-ink-teacher);
   background: rgba(0, 0, 0, 0.04);
+}
+
+.legal-nav .landing-brand-title {
+  font-size: 18px;
+}
+
+@media (max-width: 480px) {
+  .legal-nav .landing-brand-title {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 360px) {
+  .legal-nav .landing-brand-title {
+    display: none;
+  }
 }
 
 .legal-nav-cta {
@@ -64,6 +96,14 @@
   text-decoration: none;
   transition: all 0.15s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .legal-nav-cta {
+    font-size: 12.5px;
+    padding: 5px 10px;
+  }
 }
 
 .legal-nav-cta:hover {

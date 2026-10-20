@@ -112,6 +112,7 @@ body {
 }
 
 /* Result Actions Bar */
+/* Result Actions Bar */
 .result-actions-bar {
   display: flex;
   flex-direction: column;
@@ -130,15 +131,21 @@ body {
 
 .result-buttons-primary {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
   width: 100%;
 }
 
-@media (min-width: 480px) {
+.result-buttons-primary > .btn-secondary-paper {
+  flex: 1;
+}
+
+@media (min-width: 580px) {
   .result-buttons-primary {
-    flex-direction: row;
     width: auto;
+  }
+  .result-buttons-primary > .btn-secondary-paper {
+    flex: initial;
   }
 }
 
@@ -147,8 +154,15 @@ body {
   width: 100%;
 }
 
+.result-buttons-secondary > .btn-secondary-paper {
+  width: 100%;
+}
+
 @media (min-width: 580px) {
   .result-buttons-secondary {
+    width: auto;
+  }
+  .result-buttons-secondary > .btn-secondary-paper {
     width: auto;
   }
 }
@@ -483,12 +497,23 @@ body {
   justify-content: space-between;
   width: 100%;
   margin-bottom: 6px;
+  gap: 8px;
+}
+
+@media (max-width: 440px) {
+  .app-header-bar {
+    gap: 6px;
+  }
+  .app-header-auth {
+    gap: 6px;
+  }
 }
 
 .app-header-auth {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .app-auth-btn {
@@ -823,4 +848,22 @@ body {
 
 .auth-switch-btn:hover {
   color: var(--color-ink-teacher-dark);
+}
+
+/* ============================================================ */
+/* ACCESSIBILITY FOCUS RINGS                                    */
+/* ============================================================ */
+:focus-visible {
+  outline: 2px solid var(--color-ink-teacher, #C5221F);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="radio"]:focus-visible,
+.preset-chip:focus-visible {
+  outline: 2px solid var(--color-ink-teacher, #C5221F);
+  outline-offset: 2px;
 }
