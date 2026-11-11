@@ -295,9 +295,43 @@ export function handleHttpRequest(req, res) {
   // Always apply security headers to every response
   applySecurityHeaders(res);
 
-  // 1. API Routes: /api/check and /api/quota (SEC-02: prevent unhandled promise rejections)
+  const rawHost = req.headers['host'] || '';
+  const host = rawHost.toLowerCase().split(':')[0];
   const urlObj = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = urlObj.pathname;
+
+  // Domain Canonicalization & www robots.txt handling
+  // Returns HTTP 200 directly for https://www.teachercheckai.com/robots.txt
+  // while ensuring all other www requests 301-redirect to canonical https://teachercheckai.com
+  if (host.startsWith('www.')) {
+    if (pathname === '/robots.txt') {
+      let robotsFile = path.join(DIST_DIR, 'robots.txt');
+      if (!fs.existsSync(robotsFile)) {
+        robotsFile = path.resolve(__dirname, '../public/robots.txt');
+      }
+      if (fs.existsSync(robotsFile)) {
+        const robotsContent = fs.readFileSync(robotsFile);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Length', robotsContent.length);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        if (req.method === 'HEAD') {
+          res.end();
+          return;
+        }
+        res.end(robotsContent);
+        return;
+      }
+    }
+
+    res.statusCode = 301;
+    res.setHeader('Location', `https://teachercheckai.com${urlObj.pathname}${urlObj.search}`);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.end('Moved Permanently');
+    return;
+  }
+
+  // 1. API Routes: /api/check and /api/quota (SEC-02: prevent unhandled promise rejections)
   const normalizedApiPath = pathname.replace(/\/+$/, '') || '/';
 
   if (normalizedApiPath === '/api/check') {

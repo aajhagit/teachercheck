@@ -28,33 +28,35 @@ function createMockReq({ method = 'GET', url = '/', headers = {}, body = null } 
 }
 
 function createMockRes() {
-  const res = {
-    statusCode: 200,
-    headers: {},
-    body: '',
-    setHeader(key, val) {
-      this.headers[key.toLowerCase()] = val;
-    },
-    getHeader(key) {
-      return this.headers[key.toLowerCase()];
-    },
-    end(data) {
-      if (data) {
-        if (Buffer.isBuffer(data)) {
-          this.body += data.toString('utf8');
-        } else {
-          this.body += data;
-        }
-      }
-      this.ended = true;
-      if (this._onEnd) this._onEnd();
-    },
-    waitForEnd() {
-      if (this.ended) return Promise.resolve();
-      return new Promise((resolve) => {
-        this._onEnd = resolve;
-      });
+  const res = new EventEmitter();
+  res.statusCode = 200;
+  res.headers = {};
+  res.body = '';
+  res.setHeader = function(key, val) {
+    this.headers[key.toLowerCase()] = val;
+  };
+  res.getHeader = function(key) {
+    return this.headers[key.toLowerCase()];
+  };
+  res.write = function(chunk) {
+    if (chunk) {
+      this.body += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk;
     }
+    return true;
+  };
+  res.end = function(data) {
+    if (data) {
+      this.write(data);
+    }
+    this.ended = true;
+    this.emit('finish');
+    if (this._onEnd) this._onEnd();
+  };
+  res.waitForEnd = function() {
+    if (this.ended) return Promise.resolve();
+    return new Promise((resolve) => {
+      this._onEnd = resolve;
+    });
   };
   return res;
 }
@@ -452,5 +454,94 @@ describe('Sitemap & Robots.txt Integrity', () => {
     // Must NOT disallow /privacy or /terms
     assert.doesNotMatch(robotsContent, /Disallow:\s*\/privacy/i);
     assert.doesNotMatch(robotsContent, /Disallow:\s*\/terms/i);
+  });
+});
+
+describe('WWW Subdomain & Robots.txt Handling', () => {
+
+  test('GET /robots.txt with Host: www.teachercheckai.com returns HTTP 200 directly with robots content and no redirect', async () => {
+    const req = createMockReq({ method: 'GET', url: '/robots.txt', headers: { host: 'www.teachercheckai.com' } });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.getHeader('location'), undefined, 'Must not redirect /robots.txt on www');
+    assert.match(res.getHeader('content-type'), /text\/plain/);
+    assert.match(res.body, /User-agent:\s*\*/i);
+    assert.match(res.body, /Allow:\s*\//i);
+    assert.match(res.body, /Disallow:\s*\/api\//i);
+    assert.match(res.body, /Sitemap:\s*https:\/\/teachercheckai\.com\/sitemap\.xml/i);
+  });
+
+  test('HEAD /robots.txt with Host: www.teachercheckai.com returns HTTP 200 with headers and empty body', async () => {
+    const req = createMockReq({ method: 'HEAD', url: '/robots.txt', headers: { host: 'www.teachercheckai.com' } });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.getHeader('location'), undefined);
+    assert.match(res.getHeader('content-type'), /text\/plain/);
+    assert.equal(res.body, '');
+  });
+
+  test('GET / with Host: www.teachercheckai.com returns HTTP 301 Location: https://teachercheckai.com/', async () => {
+    const req = createMockReq({ method: 'GET', url: '/', headers: { host: 'www.teachercheckai.com' } });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 301);
+    assert.equal(res.getHeader('location'), 'https://teachercheckai.com/');
+  });
+
+  test('GET /privacy with Host: www.teachercheckai.com returns HTTP 301 Location: https://teachercheckai.com/privacy', async () => {
+    const req = createMockReq({ method: 'GET', url: '/privacy', headers: { host: 'www.teachercheckai.com' } });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 301);
+    assert.equal(res.getHeader('location'), 'https://teachercheckai.com/privacy');
+  });
+
+  test('GET /api/check with Host: www.teachercheckai.com returns HTTP 301 Location: https://teachercheckai.com/api/check', async () => {
+    const req = createMockReq({ method: 'GET', url: '/api/check', headers: { host: 'www.teachercheckai.com' } });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 301);
+    assert.equal(res.getHeader('location'), 'https://teachercheckai.com/api/check');
+  });
+
+  test('GET /robots.txt with Host: teachercheckai.com (apex) continues returning HTTP 200', async () => {
+    const req = createMockReq({ method: 'GET', url: '/robots.txt', headers: { host: 'teachercheckai.com' } });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.getHeader('location'), undefined);
+    assert.match(res.body, /User-agent:\s*\*/i);
+  });
+
+  test('GET / with Host: teachercheckai.com (apex) continues returning HTTP 200 landing HTML', async () => {
+    const req = createMockReq({ method: 'GET', url: '/', headers: { host: 'teachercheckai.com' } });
+    const res = createMockRes();
+
+    handleHttpRequest(req, res);
+    await res.waitForEnd();
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.getHeader('location'), undefined);
+    assert.match(res.body, /<link rel="canonical" href="https:\/\/teachercheckai\.com\/">/);
   });
 });
